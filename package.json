@@ -1,0 +1,25 @@
+{
+  "name": "wyxr-text-app",
+  "version": "1.0.0",
+  "description": "WYXR 91.7 FM Listener Text App",
+  "private": true,
+  "scripts": {
+    "install-all": "cd server && npm install && cd ../client && npm install",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "dev": "echo 'Run npm run server in one terminal and npm run client in another'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/wyxr-text-app.git"
+  },
+  "keywords": [
+    "wyxr",
+    "radio",
+    "sms",
+    "messaging",
+    "twilio"
+  ],
+  "author": "",
+  "license": "ISC"
+}

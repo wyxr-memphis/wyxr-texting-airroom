@@ -1,0 +1,138 @@
+.header {
+  background-color: #1a1a1a;
+  border-bottom: 3px solid #E9407A;
+  padding: 20px 30px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+.header-left {
+  min-width: 200px;
+}
+
+.header-title {
+  color: #FFC629;
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.header-subtitle {
+  color: #E9407A;
+  font-size: 16px;
+  margin: 4px 0 0 0;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.instructions {
+  text-align: center;
+}
+
+.instruction-title {
+  color: #2B9EB3;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.instructions p:last-child {
+  color: #ffffff;
+  font-size: 14px;
+  margin: 0;
+}
+
+.unread-badge {
+  background-color: #E9407A;
+  color: #ffffff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 200px;
+  justify-content: flex-end;
+}
+
+.power-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.power-toggle.enabled {
+  background-color: #2B9EB3;
+  color: #ffffff;
+}
+
+.power-toggle.enabled:hover {
+  background-color: #238a9e;
+}
+
+.power-toggle.disabled {
+  background-color: #555;
+  color: #999;
+}
+
+.power-toggle.disabled:hover {
+  background-color: #666;
+}
+
+.logout-button {
+  background-color: #444;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.logout-button:hover {
+  background-color: #555;
+}
+
+@media (max-width: 1200px) {
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-left, .header-right {
+    min-width: auto;
+  }
+
+  .header-center {
+    order: -1;
+  }
+
+  .header-right {
+    justify-content: center;
+  }
+}

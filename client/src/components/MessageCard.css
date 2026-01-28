@@ -1,0 +1,138 @@
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.message-card {
+  position: relative;
+  padding: 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+}
+
+.message-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.message-card.unread {
+  background-color: #FFC629;
+  border: 3px solid #E9407A;
+  color: #2B2B2B;
+  font-weight: 600;
+}
+
+.message-card.read {
+  background-color: #3a3a3a;
+  border: 2px solid #555;
+  color: #cccccc;
+  font-weight: normal;
+}
+
+.unread-indicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 12px;
+  height: 12px;
+  background-color: #E9407A;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.message-phone {
+  background: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.message-card.unread .message-phone {
+  color: #E9407A;
+  background-color: rgba(233, 64, 122, 0.1);
+}
+
+.message-card.unread .message-phone:hover {
+  background-color: rgba(233, 64, 122, 0.2);
+}
+
+.message-card.read .message-phone {
+  color: #2B9EB3;
+  background-color: rgba(43, 158, 179, 0.1);
+}
+
+.message-card.read .message-phone:hover {
+  background-color: rgba(43, 158, 179, 0.2);
+}
+
+.message-time {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.message-text {
+  flex: 1;
+  font-size: 18px;
+  line-height: 1.5;
+  word-wrap: break-word;
+  margin-bottom: 12px;
+}
+
+.message-card.unread .message-text {
+  color: #2B2B2B;
+}
+
+.message-card.read .message-text {
+  color: #cccccc;
+}
+
+.message-reply {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid;
+}
+
+.message-card.unread .message-reply {
+  border-top-color: rgba(43, 43, 43, 0.2);
+}
+
+.message-card.read .message-reply {
+  border-top-color: #555;
+}
+
+.reply-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+
+.reply-text {
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.reply-time {
+  font-size: 12px;
+  opacity: 0.6;
+}

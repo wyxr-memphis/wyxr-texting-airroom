@@ -1,0 +1,15 @@
+.app {
+  min-height: 100vh;
+  background-color: #2B2B2B;
+}
+
+.app-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #2B2B2B;
+  color: #FFC629;
+  font-size: 24px;
+  font-weight: 600;
+}
