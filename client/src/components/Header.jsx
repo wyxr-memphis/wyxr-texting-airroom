@@ -8,11 +8,6 @@ const Header = ({ unreadCount, messagingEnabled, onToggleMessaging, onLogout }) 
   return (
     <header className="header">
       <div className="header-content">
-        <div className="header-left">
-          <h1 className="header-title">WYXR 91.7 FM</h1>
-          <p className="header-subtitle">Text Messages</p>
-        </div>
-
         <div className="header-center">
           <div className="listener-info">
             <h3>📻 WYXR Listener Messages</h3>
