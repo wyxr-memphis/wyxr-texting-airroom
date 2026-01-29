@@ -2,6 +2,12 @@
 
 Real-time text messaging application for WYXR radio station. Listeners text a dedicated Twilio number, messages appear instantly on DJ's screen via WebSocket, and DJs can mark read/unread and reply via SMS.
 
+## 🌐 Live Production App
+
+**App URL:** https://wyxr-texting-airroom.vercel.app
+**Text Number:** +1 (901) 460-3031
+**Login:** Username `wyxr`, Password `wyxr2024`
+
 ## Features
 
 - **Real-time Messaging**: WebSocket-powered instant message delivery
@@ -155,15 +161,38 @@ For local development with Twilio:
 
 ## Production Deployment
 
-### Railway (Backend + Database)
+**Current Setup:** Backend on Render.com + Frontend on Vercel
 
-1. **Create Railway Project**:
-   - Go to [railway.app](https://railway.app)
-   - Click "New Project"
-   - Select "Provision PostgreSQL"
+### Render.com (Backend + Database)
+
+1. **Create Render Account**:
+   - Go to [render.com](https://render.com)
+   - Sign up with GitHub
+
+2. **Create PostgreSQL Database**:
+   - Click "New +" → "PostgreSQL"
+   - Name: `wyxr-texting-db`
+   - Region: Choose closest to you
+   - Free tier is fine
+   - Click "Create Database"
+   - Copy the **External Database URL** for migration
+
+3. **Run Database Migration** (from your local machine):
+   ```bash
+   ./render-migrate.sh
+   # Paste the External Database URL when prompted
+   ```
+
+4. **Create Web Service**:
+   - Click "New +" → "Web Service"
    - Connect your GitHub repository
+   - Name: `wyxr-texting-airroom`
+   - Root Directory: `server`
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Region: Same as database
 
-2. **Configure Environment Variables**:
+5. **Configure Environment Variables**:
    ```
    SESSION_SECRET=<generate-random-string>
    AUTH_USERNAME=wyxr
@@ -172,18 +201,14 @@ For local development with Twilio:
    TWILIO_AUTH_TOKEN=<your-token>
    TWILIO_PHONE_NUMBER=<your-twilio-number>
    NODE_ENV=production
+   PORT=10000
    FRONTEND_URL=<your-vercel-url>
    ```
-   Note: `DATABASE_URL` is automatically provided by Railway
+   Note: `DATABASE_URL` is automatically provided by Render's PostgreSQL
 
-3. **Run Database Migrations**:
-   ```bash
-   railway run psql $DATABASE_URL < server/db/schema.sql
-   ```
+6. **Deploy**: Click "Create Web Service" - Render auto-deploys on git push
 
-4. **Deploy**: Railway auto-deploys on git push
-
-5. **Get Backend URL**: Copy the public URL from Railway dashboard (e.g., `https://wyxr-backend.up.railway.app`)
+7. **Get Backend URL**: Copy from dashboard (e.g., `https://wyxr-texting-airroom.onrender.com`)
 
 ### Vercel (Frontend)
 
@@ -204,12 +229,18 @@ For local development with Twilio:
 ### Update Twilio Webhook (Production)
 
 In Twilio Console:
-- Set webhook to: `https://your-railway-url.up.railway.app/webhook/sms`
+- Go to Phone Numbers → Manage → Active Numbers
+- Click your number
+- Scroll to "Messaging Configuration"
+- Set "A MESSAGE COMES IN" webhook to: `https://your-render-url.onrender.com/webhook/sms`
 - HTTP method: POST
+- Click "Save Configuration"
 
 ### Update CORS Configuration
 
-After deploying, update the `FRONTEND_URL` in Railway to match your Vercel URL.
+After deploying frontend to Vercel:
+1. Update `FRONTEND_URL` in Render to match your Vercel URL
+2. Render will automatically redeploy with new CORS settings
 
 ## API Endpoints
 
