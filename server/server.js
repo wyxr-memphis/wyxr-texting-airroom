@@ -51,11 +51,13 @@ const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
 const settingsRoutes = require('./routes/settings');
 const webhookRoutes = require('./routes/webhook');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api', authRoutes);
 app.use('/api', messagesRoutes);
 app.use('/api', settingsRoutes);
 app.use('/webhook', webhookRoutes);
+app.use('/admin', adminRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
