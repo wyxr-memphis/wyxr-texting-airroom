@@ -23,6 +23,7 @@
 - ✅ Mark read/unread working
 - ✅ WebSocket connected
 - ✅ WYXR branding applied
+- ⚠️ **Desktop/laptop only** - Mobile Safari has cookie issues
 
 ### ✅ Twilio Configuration
 - ✅ Phone number: [WYXR Phone Number]

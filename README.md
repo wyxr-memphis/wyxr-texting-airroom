@@ -8,6 +8,8 @@ Real-time text messaging application for WYXR radio station. Listeners text a de
 **Text Number:** [Contact WYXR for number]
 **Login:** Contact WYXR staff for credentials
 
+**Note:** This app is designed for desktop/laptop use. Mobile browsers may have issues with session cookies. Please use on a desktop computer or laptop for best results.
+
 ## Features
 
 - **Real-time Messaging**: WebSocket-powered instant message delivery
