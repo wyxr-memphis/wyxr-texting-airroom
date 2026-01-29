@@ -3,12 +3,12 @@ const router = express.Router();
 const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
-// GET /api/messages - Get messages from last 24 hours
+// GET /api/messages - Get messages from last 12 hours
 router.get('/messages', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT * FROM messages
-       WHERE timestamp >= NOW() - INTERVAL '24 hours'
+       WHERE timestamp >= NOW() - INTERVAL '12 hours'
        ORDER BY timestamp DESC`
     );
     res.json(result.rows);
