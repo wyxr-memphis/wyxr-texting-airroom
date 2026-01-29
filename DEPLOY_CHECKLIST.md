@@ -49,7 +49,7 @@ Quick reference for deploying WYXR Text App to production.
 
 ## Twilio Configuration
 
-- [ ] Phone number: +1 (901) 460-3031
+- [ ] Phone number: [WYXR Phone Number]
 - [ ] Messaging webhook updated to Railway URL
 - [ ] Webhook URL: `https://[railway-url]/webhook/sms`
 - [ ] HTTP method: POST
@@ -57,7 +57,7 @@ Quick reference for deploying WYXR Text App to production.
 
 ## Final Testing
 
-- [ ] Send test SMS to (901) 460-3031
+- [ ] Send test SMS to [WYXR Phone Number]
 - [ ] Message appears in production app
 - [ ] Mark read/unread works
 - [ ] Power toggle works

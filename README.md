@@ -5,8 +5,8 @@ Real-time text messaging application for WYXR radio station. Listeners text a de
 ## 🌐 Live Production App
 
 **App URL:** https://wyxr-texting-airroom.vercel.app
-**Text Number:** +1 (901) 460-3031
-**Login:** Username `wyxr`, Password `wyxr2024`
+**Text Number:** [Contact WYXR for number]
+**Login:** Contact WYXR staff for credentials
 
 ## Features
 

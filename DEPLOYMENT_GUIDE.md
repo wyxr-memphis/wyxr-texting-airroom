@@ -48,7 +48,7 @@ AUTH_USERNAME=wyxr
 AUTH_PASSWORD=<your-secure-password>
 TWILIO_ACCOUNT_SID=<from-twilio-console>
 TWILIO_AUTH_TOKEN=<from-twilio-console>
-TWILIO_PHONE_NUMBER=+19014603031
+TWILIO_PHONE_NUMBER=[WYXR_PHONE]
 NODE_ENV=production
 PORT=3001
 FRONTEND_URL=<will-add-after-vercel-deployment>
@@ -194,7 +194,7 @@ Go back to Railway:
 
 1. Go to Twilio Console: https://console.twilio.com/
 2. Navigate to: **Phone Numbers** → **Manage** → **Active numbers**
-3. Click on: **+1 (901) 460-3031**
+3. Click on: **[WYXR Phone Number]**
 4. Scroll to **"Messaging Configuration"**
 5. Under **"A message comes in"**:
    - Type: **Webhook**
@@ -210,7 +210,7 @@ Go back to Railway:
 
 ### Test Incoming SMS
 
-1. Send a text to: +1 (901) 460-3031
+1. Send a text to: [WYXR Phone Number]
 2. Check Railway logs (should see "Incoming SMS")
 3. Open your Vercel app
 4. Login

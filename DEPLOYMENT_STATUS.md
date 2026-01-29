@@ -25,7 +25,7 @@
 - ✅ WYXR branding applied
 
 ### ✅ Twilio Configuration
-- ✅ Phone number: +1 (901) 460-3031
+- ✅ Phone number: [WYXR Phone Number]
 - ✅ Webhook: https://wyxr-texting-airroom.onrender.com/webhook/sms
 - ✅ SMS receiving working in production
 - ⏳ SMS sending blocked until A2P approval (1-2 weeks)
@@ -42,7 +42,7 @@
 ## 🎯 What's Working Right Now
 
 ### Fully Functional Features
-- ✅ **SMS Receiving**: Text +1 (901) 460-3031 → appears instantly in app
+- ✅ **SMS Receiving**: Text [WYXR Phone Number] → appears instantly in app
 - ✅ **Real-time Updates**: Messages appear immediately via WebSocket
 - ✅ **Authentication**: Login with username/password
 - ✅ **Mark Read/Unread**: Click messages to toggle status
@@ -92,14 +92,14 @@ Environment variables are configured in Railway but the service hasn't redeploye
 All these are confirmed added to Railway Variables:
 
 ```
-SESSION_SECRET=Xo+vHDnfGJ3nfxDRC9TfymCRd+5oVx0c2CtA/zmMILo=
+SESSION_SECRET=[SESSION_SECRET]
 AUTH_USERNAME=wyxr
-AUTH_PASSWORD=wyxr2024
+AUTH_PASSWORD=[PASSWORD]
 NODE_ENV=production
 PORT=3001
-TWILIO_ACCOUNT_SID=AC050ca89df34aa82bc61907592cad69a0
-TWILIO_AUTH_TOKEN=688546f25c703c536d0f9faa5154674d
-TWILIO_PHONE_NUMBER=+19014603031
+TWILIO_ACCOUNT_SID=[TWILIO_SID]
+TWILIO_AUTH_TOKEN=[TWILIO_AUTH_TOKEN]
+TWILIO_PHONE_NUMBER=[WYXR_PHONE]
 ```
 
 **Note:** `DATABASE_URL` is automatically provided by Railway PostgreSQL service.
@@ -120,7 +120,7 @@ TWILIO_PHONE_NUMBER=+19014603031
 
 2. **Train DJs**:
    - Share URL: https://wyxr-texting-airroom.vercel.app
-   - Login credentials: Username `wyxr`, Password `wyxr2024`
+   - Login credentials: Username `wyxr`, Password `[PASSWORD]`
    - Show how to mark read/unread
    - Show how to reply to messages
    - Explain power toggle
@@ -165,7 +165,7 @@ TWILIO_PHONE_NUMBER=+19014603031
 - **Frontend**: https://wyxr-texting-airroom.vercel.app
 - **Backend**: https://wyxr-texting-airroom.onrender.com
 - **Health Check**: https://wyxr-texting-airroom.onrender.com/health
-- **Login**: username `wyxr`, password `wyxr2024`
+- **Login**: username `wyxr`, password `[PASSWORD]`
 
 ### Local Development
 - **Database**: `wyxr_texts` (PostgreSQL on localhost)
@@ -190,8 +190,8 @@ TWILIO_PHONE_NUMBER=+19014603031
 - **Auto-deploy**: Enabled on git push
 
 ### Twilio
-- **Phone**: +1 (901) 460-3031
-- **SID**: AC050ca89df34aa82bc61907592cad69a0
+- **Phone**: [WYXR Phone Number]
+- **SID**: [TWILIO_SID]
 - **Webhook**: https://wyxr-texting-airroom.onrender.com/webhook/sms
 - **A2P Status**: Pending approval
 

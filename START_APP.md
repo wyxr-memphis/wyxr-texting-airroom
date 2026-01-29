@@ -23,7 +23,7 @@ The frontend will automatically open at: **http://localhost:3000**
 ### Login Credentials
 
 - **Username**: `wyxr`
-- **Password**: `wyxr2024`
+- **Password**: `[PASSWORD]`
 
 ⚠️ Change the password in `server/.env` before deploying to production!
 

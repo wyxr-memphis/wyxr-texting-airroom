@@ -168,7 +168,7 @@ cd client && npm start
 4. Open http://localhost:3000
 5. Login with:
    - Username: `wyxr`
-   - Password: `wyxr2024`
+   - Password: `[PASSWORD]`
 
 ## Current Configuration
 
@@ -178,7 +178,7 @@ Your environment files have been created:
 - Database: `postgresql://localhost:5432/wyxr_texts`
 - Session secret: Generated securely
 - Auth username: `wyxr`
-- Auth password: `wyxr2024` (CHANGE THIS!)
+- Auth password: `[PASSWORD]` (CHANGE THIS!)
 - Twilio: Placeholder values (update when ready)
 
 **client/.env**
@@ -186,7 +186,7 @@ Your environment files have been created:
 
 ## Security Notes
 
-⚠️ **IMPORTANT**: The default password is `wyxr2024`. Change this in `server/.env` before deploying to production!
+⚠️ **IMPORTANT**: The default password is `[PASSWORD]`. Change this in `server/.env` before deploying to production!
 
 To generate a new session secret:
 ```bash
