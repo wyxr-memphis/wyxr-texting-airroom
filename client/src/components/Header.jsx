@@ -1,5 +1,6 @@
 import React from 'react';
 import { Power } from 'lucide-react';
+import GettingStarted from './GettingStarted';
 import './Header.css';
 
 const Header = ({ unreadCount, messagingEnabled, onToggleMessaging, onLogout }) => {
@@ -31,6 +32,8 @@ const Header = ({ unreadCount, messagingEnabled, onToggleMessaging, onLogout }) 
         </div>
 
         <div className="header-right">
+          <GettingStarted />
+
           <button
             onClick={onToggleMessaging}
             className={`power-toggle ${messagingEnabled ? 'enabled' : 'disabled'}`}
