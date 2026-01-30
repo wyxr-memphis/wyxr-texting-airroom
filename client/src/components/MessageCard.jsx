@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatPhoneNumber, formatTime } from '../utils/formatters';
-import { MessageSquare, CheckCheck, Eye, EyeOff } from 'lucide-react';
+import { MessageSquare, Eye, EyeOff } from 'lucide-react';
 import './MessageCard.css';
 
 const MessageCard = ({ message, onMarkRead, onReply }) => {
