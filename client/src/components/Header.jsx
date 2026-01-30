@@ -23,11 +23,6 @@ const Header = ({ unreadCount, messagingEnabled, onToggleMessaging, onLogout }) 
             </div>
           </div>
 
-          <div className="instructions">
-            <p className="instruction-title">Instructions:</p>
-            <p>Click message to mark read/unread • Click phone number to reply</p>
-          </div>
-
           {unreadCount > 0 && (
             <div className="unread-badge">
               {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}

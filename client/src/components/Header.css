@@ -72,23 +72,6 @@
   font-weight: 500;
 }
 
-.instructions {
-  text-align: center;
-}
-
-.instruction-title {
-  color: #2B9EB3;
-  font-weight: 600;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.instructions p:last-child {
-  color: #ffffff;
-  font-size: 14px;
-  margin: 0;
-}
-
 .unread-badge {
   background-color: #E9407A;
   color: #ffffff;

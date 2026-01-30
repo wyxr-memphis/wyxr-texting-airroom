@@ -1,32 +1,25 @@
 import React from 'react';
 import { formatPhoneNumber, formatTime } from '../utils/formatters';
+import { MessageSquare, CheckCheck, Eye, EyeOff } from 'lucide-react';
 import './MessageCard.css';
 
 const MessageCard = ({ message, onMarkRead, onReply }) => {
-  const handleCardClick = () => {
+  const handleMarkRead = (e) => {
+    e.stopPropagation();
     onMarkRead(message.id, !message.read);
   };
 
-  const handlePhoneClick = (e) => {
+  const handleReply = (e) => {
     e.stopPropagation();
     onReply(message);
   };
 
   return (
-    <div
-      className={`message-card ${message.read ? 'read' : 'unread'}`}
-      onClick={handleCardClick}
-    >
+    <div className={`message-card ${message.read ? 'read' : 'unread'}`}>
       {!message.read && <div className="unread-indicator" />}
 
       <div className="message-header">
-        <button
-          className="message-phone"
-          onClick={handlePhoneClick}
-          title="Click to reply"
-        >
-          {formatPhoneNumber(message.phone)}
-        </button>
+        <span className="message-phone">{formatPhoneNumber(message.phone)}</span>
         <span className="message-time">{formatTime(message.timestamp)}</span>
       </div>
 
@@ -39,6 +32,26 @@ const MessageCard = ({ message, onMarkRead, onReply }) => {
           <div className="reply-time">{formatTime(message.replied_at)}</div>
         </div>
       )}
+
+      <div className="message-actions">
+        <button
+          className={`action-btn ${message.read ? 'mark-unread' : 'mark-read'}`}
+          onClick={handleMarkRead}
+          title={message.read ? 'Mark as unread' : 'Mark as read'}
+        >
+          {message.read ? <EyeOff size={16} /> : <Eye size={16} />}
+          <span>{message.read ? 'Mark Unread' : 'Mark Read'}</span>
+        </button>
+
+        <button
+          className="action-btn reply-btn"
+          onClick={handleReply}
+          title="Reply to this message"
+        >
+          <MessageSquare size={16} />
+          <span>Reply</span>
+        </button>
+      </div>
     </div>
   );
 };
