@@ -134,22 +134,17 @@ Integrate voice messages from Twilio Flex into the text message dashboard so DJs
 - Response time metrics
 - Peak messaging times
 
-### 7. Scheduled Messages
-- Schedule automated station announcements
-- Birthday/event reminders for listeners
-- Contest notifications
-
-### 8. Group/Bulk Messaging
+### 7. Group/Bulk Messaging
 - Send announcements to all recent listeners
 - Contest notifications to opted-in users
 - Emergency station updates
 
-### 9. Auto-Responder
+### 8. Auto-Responder
 - Automatic "Thanks for texting!" confirmation
 - After-hours automated response
 - FAQ auto-responses for common questions
 
-### 10. Multi-Station Support
+### 9. Multi-Station Support
 - Support multiple radio stations in one app
 - Station-specific branding
 - Separate message pools per station
