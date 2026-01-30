@@ -1,0 +1,16 @@
+To create apple-touch-icon.png (180x180):
+
+Option 1 - Use online converter:
+1. Go to https://convertio.co/svg-png/
+2. Upload favicon.svg
+3. Set size to 180x180px
+4. Download as apple-touch-icon.png
+5. Place in client/public/
+
+Option 2 - Use Figma/Photoshop:
+1. Open favicon.svg
+2. Export as PNG at 180x180px
+3. Save as apple-touch-icon.png
+
+Option 3 - ImageMagick (if installed):
+convert -background none -resize 180x180 favicon.svg apple-touch-icon.png
