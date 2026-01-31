@@ -41,7 +41,7 @@
 .on-air-box {
   background-color: #FFC629;
   color: #2B2B2B;
-  padding: 12px 16px;
+  padding: 16px 20px;
   border-radius: 8px;
   border: 2px solid #E9407A;
   margin-bottom: 8px;
@@ -50,19 +50,22 @@
 .on-air-box strong {
   font-weight: 700;
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  font-size: 18px;
 }
 
 .on-air-box p {
   margin: 0;
-  line-height: 1.4;
-  font-size: 14px;
+  line-height: 1.5;
+  font-size: 20px;
+  font-weight: 500;
 }
 
 .on-air-box p strong {
   display: inline;
   font-weight: 700;
   color: #E9407A;
+  font-size: 22px;
 }
 
 .message-info {
