@@ -115,6 +115,15 @@ function App() {
 
   const unreadCount = messages.filter((msg) => !msg.read).length;
 
+  // Update document title with unread count
+  useEffect(() => {
+    if (unreadCount > 0) {
+      document.title = `(${unreadCount}) WYXR Text App`;
+    } else {
+      document.title = 'WYXR Text App';
+    }
+  }, [unreadCount]);
+
   if (loading) {
     return (
       <div className="app-loading">
