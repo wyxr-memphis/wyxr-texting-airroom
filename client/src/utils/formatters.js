@@ -2,10 +2,10 @@ export const formatPhoneNumber = (phone) => {
   // Remove +1 country code if present
   const cleaned = phone.replace(/^\+1/, '');
 
-  // Format as (XXX) XXX-XXXX
+  // Format as (XXX) xxx-XXXX (mask middle 3 digits for privacy)
   const match = cleaned.match(/^(\d{3})(\d{3})(\d{4})$/);
   if (match) {
-    return `(${match[1]}) ${match[2]}-${match[3]}`;
+    return `(${match[1]}) xxx-${match[3]}`;
   }
 
   return phone;
