@@ -15,27 +15,15 @@
   margin: 0 auto;
 }
 
-.header-center {
+.header-left-section {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  max-width: 900px;
-  margin: 0 auto;
+  max-width: 700px;
 }
 
-.listener-info {
-  width: 100%;
-  max-width: 600px;
-  margin-bottom: 8px;
-}
-
-.listener-info h3 {
+.header-logo {
   color: #FFC629;
   font-size: 16px;
   margin: 0 0 8px 0;
-  text-align: center;
 }
 
 .on-air-box {
@@ -86,11 +74,24 @@
 
 .header-right {
   display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: flex-start;
-  position: absolute;
-  right: 30px;
-  top: 20px;
+  align-items: flex-end;
+}
+
+.header-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  align-items: center;
+}
+
+.header-right-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 4px;
 }
 
 .power-toggle {
