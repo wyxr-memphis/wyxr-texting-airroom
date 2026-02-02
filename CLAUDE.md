@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Recommended Model
+
+Use **Claude Sonnet 4.5** (`claude-sonnet-4-5-20250929`) as the default model for all work on this codebase. This model provides the best balance of performance, code quality, and cost for this project.
+
 ## Project Overview
 
 Real-time text messaging application for WYXR 91.7 FM radio station. Listeners text a Twilio number, messages appear instantly on DJ's screen via WebSocket, and DJs can mark read/unread. Reply functionality exists but requires Twilio A2P approval.
