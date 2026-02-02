@@ -111,6 +111,77 @@ Integrate voice messages from Twilio Flex into the text message dashboard so DJs
 
 ---
 
+## Priority 3: Moderation & Safety Features
+
+### 3. Phone Number Blocking System
+
+**Status:** 💡 Feature Request
+
+**Description:**
+Allow staff administrators to block phone numbers that send inappropriate or abusive messages. Blocked messages would still be stored in the database for review but would not appear in the DJ dashboard.
+
+**Use Case:**
+When a listener sends inappropriate content, station staff (not DJs) can block that number from the admin panel to prevent future messages from appearing on-air or distracting DJs.
+
+**Requirements:**
+- **Block Scope:** Block entire phone number (not message-level filtering)
+- **Message Handling:** Blocked messages are stored in database but NOT broadcast to DJ dashboard
+- **Access Control:** Only staff with admin panel access can block/unblock numbers (not DJs)
+- **Audit Trail:** Track who blocked a number, when, and optionally why
+
+**Technical Implementation:**
+
+**Database Changes:**
+- Add `blocked_numbers` table with columns:
+  - `phone` (E.164 format, primary key)
+  - `blocked_at` (timestamp)
+  - `blocked_by` (admin username)
+  - `reason` (optional text field)
+  - `notes` (optional internal notes)
+
+**Webhook Modification (`server/routes/webhook.js`):**
+```javascript
+// Check if number is blocked before broadcasting
+const isBlocked = await checkIfBlocked(From);
+
+// Still insert message to database (for staff review)
+const message = await insertMessage(From, Body);
+
+// Only broadcast to DJs if NOT blocked
+if (!isBlocked) {
+  io.emit('message:new', message);
+}
+```
+
+**Admin Panel Enhancements (`/admin/messages`):**
+- Add "Block Number" button next to each message
+- Add "Blocked Numbers" section showing all blocked numbers
+- Add "Unblock" functionality
+- Show blocked messages with visual indicator (red border/badge)
+- Optional: Add reason field when blocking
+
+**Frontend Consideration:**
+- No changes needed to DJ dashboard (blocked messages simply won't appear)
+- Messages from blocked numbers never reach WebSocket broadcast
+
+**Questions to Answer:**
+1. Should blocked numbers receive any auto-reply? (Probably no - silent block)
+2. How long should blocks persist? (Permanent until manually unblocked)
+3. Should there be a "soft block" vs "hard block" option? (Not initially)
+4. Export blocked number list for reporting? (Nice to have)
+
+**Estimated Effort:**
+- Database schema & migration: 1 hour
+- Webhook modification: 1 hour
+- Admin panel UI: 3-4 hours
+- Testing: 1-2 hours
+- **Total: 6-8 hours**
+
+**Dependencies:**
+- None (uses existing admin panel infrastructure and authentication)
+
+---
+
 ## Future Enhancement Ideas
 
 ### 3. Message Search & Filtering
