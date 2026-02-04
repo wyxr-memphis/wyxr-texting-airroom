@@ -3,13 +3,16 @@ const router = express.Router();
 const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
-// GET /api/messages - Get messages from last 12 hours
+// GET /api/messages - Get messages from last 12 hours (excluding blocked numbers)
 router.get('/messages', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM messages
-       WHERE timestamp >= NOW() - INTERVAL '12 hours'
-       ORDER BY timestamp DESC`
+      `SELECT m.* FROM messages m
+       WHERE m.timestamp >= NOW() - INTERVAL '12 hours'
+       AND NOT EXISTS (
+         SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone
+       )
+       ORDER BY m.timestamp DESC`
     );
     res.json(result.rows);
   } catch (error) {
