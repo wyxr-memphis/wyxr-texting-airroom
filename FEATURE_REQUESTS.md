@@ -115,7 +115,7 @@ Integrate voice messages from Twilio Flex into the text message dashboard so DJs
 
 ### 3. Phone Number Blocking System
 
-**Status:** 💡 Feature Request
+**Status:** ✅ IMPLEMENTED (January 2026)
 
 **Description:**
 Allow staff administrators to block phone numbers that send inappropriate or abusive messages. Blocked messages would still be stored in the database for review but would not appear in the DJ dashboard.
@@ -123,99 +123,143 @@ Allow staff administrators to block phone numbers that send inappropriate or abu
 **Use Case:**
 When a listener sends inappropriate content, station staff (not DJs) can block that number from the admin panel to prevent future messages from appearing on-air or distracting DJs.
 
-**Requirements:**
-- **Block Scope:** Block entire phone number (not message-level filtering)
-- **Message Handling:** Blocked messages are stored in database but NOT broadcast to DJ dashboard
-- **Access Control:** Only staff with admin panel access can block/unblock numbers (not DJs)
-- **Audit Trail:** Track who blocked a number, when, and optionally why
+**What Was Implemented:**
 
-**Technical Implementation:**
+✅ **Database:**
+- `blocked_numbers` table with phone, blocked_at, blocked_by, reason, notes columns
+- Migration script for safe production deployment
 
-**Database Changes:**
-- Add `blocked_numbers` table with columns:
-  - `phone` (E.164 format, primary key)
-  - `blocked_at` (timestamp)
-  - `blocked_by` (admin username)
-  - `reason` (optional text field)
-  - `notes` (optional internal notes)
+✅ **Webhook Protection:**
+- Incoming messages checked against blocked_numbers table
+- Blocked messages stored in database but NOT broadcast to DJ dashboard
+- DJs never see messages from blocked numbers
 
-**Webhook Modification (`server/routes/webhook.js`):**
-```javascript
-// Check if number is blocked before broadcasting
-const isBlocked = await checkIfBlocked(From);
+✅ **Admin Panel Features:**
+- "Block" button next to each message with modal dialog
+- Reason dropdown (Inappropriate content, Spam, Harassment, Other)
+- Optional notes field for internal documentation
+- "Blocked Numbers" section showing all blocked numbers with details
+- "Unblock" button to remove blocks
+- Blocked badge on messages from blocked numbers
 
-// Still insert message to database (for staff review)
-const message = await insertMessage(From, Body);
+✅ **Access Control:**
+- Only admin panel users can block/unblock (requires authentication)
+- DJs have no access to blocking functionality
 
-// Only broadcast to DJs if NOT blocked
-if (!isBlocked) {
-  io.emit('message:new', message);
-}
-```
+**Files Modified:**
+- `server/db/migrations/003_add_blocked_numbers.sql` - Database schema
+- `server/routes/webhook.js` - Block check before broadcast
+- `server/routes/admin.js` - Block/unblock endpoints and UI
+- `render-migrate.sh` - Migration script for production
 
-**Admin Panel Enhancements (`/admin/messages`):**
-- Add "Block Number" button next to each message
-- Add "Blocked Numbers" section showing all blocked numbers
-- Add "Unblock" functionality
-- Show blocked messages with visual indicator (red border/badge)
-- Optional: Add reason field when blocking
+**Access:** `/admin/messages` → Click "Block" button next to any message
 
-**Frontend Consideration:**
-- No changes needed to DJ dashboard (blocked messages simply won't appear)
-- Messages from blocked numbers never reach WebSocket broadcast
+---
 
-**Questions to Answer:**
-1. Should blocked numbers receive any auto-reply? (Probably no - silent block)
-2. How long should blocks persist? (Permanent until manually unblocked)
-3. Should there be a "soft block" vs "hard block" option? (Not initially)
-4. Export blocked number list for reporting? (Nice to have)
+---
 
-**Estimated Effort:**
-- Database schema & migration: 1 hour
-- Webhook modification: 1 hour
-- Admin panel UI: 3-4 hours
-- Testing: 1-2 hours
-- **Total: 6-8 hours**
+## Priority 4: Admin Tools & Reporting
 
-**Dependencies:**
-- None (uses existing admin panel infrastructure and authentication)
+### 4. Message Search & Filtering
+
+**Status:** ✅ IMPLEMENTED (February 2026)
+
+**Description:**
+Advanced search and filtering capabilities for the admin panel, allowing staff to find messages by text content, phone number, date range, and status filters. Includes CSV export for record-keeping.
+
+**What Was Implemented:**
+
+✅ **Backend Search API:**
+- New endpoint: `GET /admin/messages/search`
+- Query parameters:
+  - `search` - Full-text search (searches both phone AND message content)
+  - `phone` - Filter by specific phone number (exact match)
+  - `startDate` / `endDate` - Date range filtering
+  - `read` / `replied` - Status filtering
+  - `limit` / `offset` - Pagination support
+- Returns paginated results with total count
+- Secure parameterized SQL queries (SQL injection safe)
+- Uses existing database indexes for performance
+
+✅ **Admin Panel Filter UI:**
+- Replaced simple search box with comprehensive filter panel
+- Text search input (searches message content or phone number)
+- Phone number filter (E.164 format)
+- Start date and end date pickers
+- Read status dropdown (All / Unread Only / Read Only)
+- Replied status dropdown (All / Replied / Not Replied)
+- Apply Filters button (fetches filtered results from server)
+- Clear Filters button (resets all inputs)
+- Live result count: "Showing X of Y messages"
+- Responsive design (mobile, tablet, desktop)
+- WYXR brand colors maintained
+
+✅ **CSV Export Feature:**
+- Export CSV button in filter panel
+- Downloads filtered messages as CSV file
+- Filename includes date: `wyxr-messages-YYYY-MM-DD.csv`
+- Columns: ID, Phone, Message, Timestamp, Read, Replied, Reply Text, Blocked
+- Proper CSV escaping (quotes, commas, line breaks)
+- User feedback alert with count of exported messages
+- Prevents empty exports (shows alert if 0 results)
+- Supports up to 10,000 messages per export
+
+**Technical Details:**
+- Server-side filtering (scalable for thousands of messages)
+- Dynamic SQL query building based on active filters
+- All filters can be combined together
+- Performance: <100ms queries with current indexes
+- No new dependencies or environment variables needed
+
+**Use Cases:**
+- "Find unread messages from yesterday"
+- "Show all messages containing 'song request'"
+- "Export all messages from last week to CSV"
+- "See which messages we haven't replied to"
+- "Find all messages from a specific phone number"
+
+**Files Modified:**
+- `server/routes/admin.js` - Added search endpoint, filter UI, CSV export
+
+**Documentation Created:**
+- `SEARCH_IMPLEMENTATION_SUMMARY.md` - Technical overview
+- `TESTING_SEARCH_FEATURE.md` - Testing guide
+- `FEATURE_COMPARISON.md` - Before/after comparison
+- `DEPLOYMENT_CHECKLIST.md` - Deployment guide
+
+**Access:** `/admin/messages` → Use filter panel at top of page
 
 ---
 
 ## Future Enhancement Ideas
 
-### 3. Message Search & Filtering
-- Search messages by phone number, text content, or date range
-- Filter by read/unread, replied/not replied
-- Export messages to CSV
-
-### 4. DJ Shift Management
+### 5. DJ Shift Management
 - Track which DJ was on air when message received
 - Auto-tag messages with DJ shift info
 - Shift handoff notes
 
-### 5. Listener Contact Management
+### 6. Listener Contact Management
 - Save frequent texters as "contacts"
 - Add notes about listeners
 - Track conversation history per phone number
 
-### 6. Analytics Dashboard
+### 7. Analytics Dashboard
 - Messages per hour/day/week
 - Most active listeners
 - Response time metrics
 - Peak messaging times
 
-### 7. Group/Bulk Messaging
+### 8. Group/Bulk Messaging
 - Send announcements to all recent listeners
 - Contest notifications to opted-in users
 - Emergency station updates
 
-### 8. Auto-Responder
+### 9. Auto-Responder
 - Automatic "Thanks for texting!" confirmation
 - After-hours automated response
 - FAQ auto-responses for common questions
 
-### 9. Multi-Station Support
+### 10. Multi-Station Support
 - Support multiple radio stations in one app
 - Station-specific branding
 - Separate message pools per station
@@ -236,4 +280,4 @@ Have a feature idea? Add it to this document or discuss with the development tea
 
 ---
 
-**Last Updated:** January 29, 2026
+**Last Updated:** February 3, 2026

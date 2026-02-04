@@ -3,6 +3,99 @@ const router = express.Router();
 const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
+// GET /admin/messages/search - Search and filter messages (API endpoint)
+router.get('/messages/search', requireAuth, async (req, res) => {
+  try {
+    const {
+      search,
+      phone,
+      startDate,
+      endDate,
+      read,
+      replied,
+      limit = 100,
+      offset = 0
+    } = req.query;
+
+    // Build WHERE clauses dynamically
+    const conditions = ['1=1'];
+    const params = [];
+    let paramCount = 1;
+
+    // Text search (phone OR message content)
+    if (search) {
+      conditions.push(`(m.text ILIKE $${paramCount} OR m.phone ILIKE $${paramCount})`);
+      params.push(`%${search}%`);
+      paramCount++;
+    }
+
+    // Phone filter
+    if (phone) {
+      conditions.push(`m.phone = $${paramCount}`);
+      params.push(phone);
+      paramCount++;
+    }
+
+    // Date range
+    if (startDate) {
+      conditions.push(`m.timestamp >= $${paramCount}`);
+      params.push(startDate);
+      paramCount++;
+    }
+    if (endDate) {
+      conditions.push(`m.timestamp <= $${paramCount}`);
+      params.push(endDate);
+      paramCount++;
+    }
+
+    // Read status
+    if (read === 'true') {
+      conditions.push('m.read = true');
+    } else if (read === 'false') {
+      conditions.push('m.read = false');
+    }
+
+    // Replied status
+    if (replied === 'true') {
+      conditions.push('m.replied = true');
+    } else if (replied === 'false') {
+      conditions.push('m.replied = false');
+    }
+
+    // Add limit and offset
+    params.push(limit, offset);
+
+    const query = `
+      SELECT m.*,
+             EXISTS(SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone) as is_blocked
+      FROM messages m
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY m.timestamp DESC
+      LIMIT $${paramCount} OFFSET $${paramCount + 1}
+    `;
+
+    const result = await pool.query(query, params);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM messages m
+      WHERE ${conditions.join(' AND ')}
+    `;
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
+
+    res.json({
+      messages: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('Error searching messages:', error);
+    res.status(500).json({ error: 'Failed to search messages' });
+  }
+});
+
 // GET /admin/messages - View all messages (admin interface)
 router.get('/messages', requireAuth, async (req, res) => {
   try {
@@ -141,9 +234,69 @@ router.get('/messages', requireAuth, async (req, res) => {
       background: #e6b324;
     }
 
+    .btn-secondary {
+      background: #666;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #555;
+    }
+
     .badge-blocked {
       background: #666;
       color: white;
+    }
+
+    .filter-panel {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 2px solid #2B9EB3;
+    }
+
+    .filter-panel h3 {
+      color: #FFC629;
+      margin-bottom: 15px;
+    }
+
+    .filter-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .filter-grid-4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .filter-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .filter-input {
+      padding: 10px;
+      background: #2B2B2B;
+      border: 2px solid #2B9EB3;
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+    }
+
+    .filter-input:focus {
+      outline: none;
+      border-color: #FFC629;
+    }
+
+    .result-info {
+      color: #999;
+      margin-bottom: 10px;
     }
 
     .search-box {
@@ -250,6 +403,15 @@ router.get('/messages', requireAuth, async (req, res) => {
     }
 
     @media (max-width: 768px) {
+      .filter-grid-2,
+      .filter-grid-4 {
+        grid-template-columns: 1fr;
+      }
+
+      .filter-buttons {
+        flex-direction: column;
+      }
+
       .table-container {
         overflow-x: auto;
       }
@@ -281,9 +443,41 @@ router.get('/messages', requireAuth, async (req, res) => {
     </div>
   </div>
 
-  <div class="controls">
-    <input type="text" id="searchBox" class="search-box" placeholder="Search messages or phone numbers...">
-    <a href="/" class="btn btn-primary">← Back to App</a>
+  <div class="filter-panel">
+    <h3>Search & Filter Messages</h3>
+
+    <div class="filter-grid-2">
+      <input type="text" id="searchText" placeholder="Search text or phone..." class="filter-input">
+      <input type="text" id="phoneFilter" placeholder="Phone: +19015551234" class="filter-input">
+    </div>
+
+    <div class="filter-grid-4">
+      <input type="date" id="startDate" class="filter-input">
+      <input type="date" id="endDate" class="filter-input">
+
+      <select id="readFilter" class="filter-input">
+        <option value="all">All Messages</option>
+        <option value="false">Unread Only</option>
+        <option value="true">Read Only</option>
+      </select>
+
+      <select id="repliedFilter" class="filter-input">
+        <option value="all">All</option>
+        <option value="true">Replied</option>
+        <option value="false">Not Replied</option>
+      </select>
+    </div>
+
+    <div class="filter-buttons">
+      <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
+      <button id="clearFilters" class="btn btn-secondary">Clear</button>
+      <button id="exportCSV" class="btn btn-warning">Export CSV</button>
+      <a href="/" class="btn btn-primary">← Back to App</a>
+    </div>
+  </div>
+
+  <div class="result-info">
+    Showing <span id="resultCount">0</span> of <span id="totalCount">0</span> messages
   </div>
 
   <div class="table-container">
@@ -386,34 +580,211 @@ router.get('/messages', requireAuth, async (req, res) => {
   </div>
 
   <script>
-    // Search functionality
-    const searchBox = document.getElementById('searchBox');
-    const table = document.getElementById('messagesTable');
-    const blockedTable = document.getElementById('blockedTable');
+    let currentFilters = {};
+    let currentPage = 0;
+    const PAGE_SIZE = 100;
 
-    if (searchBox) {
-      searchBox.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
+    async function fetchMessages() {
+      const params = new URLSearchParams({
+        ...currentFilters,
+        limit: PAGE_SIZE,
+        offset: currentPage * PAGE_SIZE
+      });
 
-        // Search messages table
-        if (table) {
-          const rows = table.querySelectorAll('tbody tr');
-          rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(searchTerm) ? '' : 'none';
-          });
-        }
+      // Remove empty params
+      for (const [key, value] of Array.from(params.entries())) {
+        if (!value || value === 'all') params.delete(key);
+      }
 
-        // Search blocked numbers table
-        if (blockedTable) {
-          const rows = blockedTable.querySelectorAll('tbody tr');
-          rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(searchTerm) ? '' : 'none';
-          });
-        }
+      try {
+        const response = await fetch(\`/admin/messages/search?\${params}\`, {
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+        renderMessages(data.messages);
+        updateCounts(data.total, data.messages.length);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        alert('Error loading messages');
+      }
+    }
+
+    function renderMessages(messages) {
+      const tbody = document.querySelector('#messagesTable tbody');
+      if (!tbody) return;
+
+      if (messages.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #999;">No messages found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = messages.map(msg => \`
+        <tr data-id="\${msg.id}">
+          <td class="phone">\${formatPhone(msg.phone)}</td>
+          <td class="message-text">
+            \${escapeHtml(msg.text)}
+            \${msg.replied ? \`<div class="reply-text">↳ Reply: \${escapeHtml(msg.reply_text || '')}</div>\` : ''}
+          </td>
+          <td class="timestamp">\${formatDate(msg.timestamp)}</td>
+          <td>
+            <span class="badge \${msg.read ? 'badge-read' : 'badge-unread'}">\${msg.read ? 'Read' : 'Unread'}</span>
+            \${msg.replied ? '<span class="badge badge-replied">Replied</span>' : ''}
+            \${msg.is_blocked ? '<span class="badge badge-blocked">Blocked</span>' : ''}
+          </td>
+          <td>
+            \${!msg.is_blocked ? \`<button class="btn btn-warning block-btn" data-phone="\${msg.phone}">Block</button>\` : '<span class="badge badge-blocked">Blocked</span>'}
+            <button class="btn btn-danger delete-btn" data-id="\${msg.id}">Delete</button>
+          </td>
+        </tr>
+      \`).join('');
+    }
+
+    function updateCounts(total, filtered) {
+      document.getElementById('totalCount').textContent = total;
+      document.getElementById('resultCount').textContent = filtered;
+    }
+
+    function formatPhone(phone) {
+      const cleaned = phone.replace(/\\D/g, '');
+      if (cleaned.length === 11 && cleaned.startsWith('1')) {
+        return \`(\${cleaned.slice(1, 4)}) \${cleaned.slice(4, 7)}-\${cleaned.slice(7)}\`;
+      }
+      if (cleaned.length === 10) {
+        return \`(\${cleaned.slice(0, 3)}) \${cleaned.slice(3, 6)}-\${cleaned.slice(6)}\`;
+      }
+      return phone;
+    }
+
+    function formatDate(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+      if (hours < 1) {
+        const minutes = Math.floor(diff / (1000 * 60));
+        return \`\${minutes} min\${minutes !== 1 ? 's' : ''} ago\`;
+      }
+      if (hours < 24) {
+        return \`\${hours} hour\${hours !== 1 ? 's' : ''} ago\`;
+      }
+      if (days < 7) {
+        return \`\${days} day\${days !== 1 ? 's' : ''} ago\`;
+      }
+
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        hour: 'numeric',
+        minute: '2-digit'
       });
     }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Apply filters button
+    document.getElementById('applyFilters').addEventListener('click', () => {
+      currentFilters = {
+        search: document.getElementById('searchText').value,
+        phone: document.getElementById('phoneFilter').value,
+        startDate: document.getElementById('startDate').value,
+        endDate: document.getElementById('endDate').value,
+        read: document.getElementById('readFilter').value,
+        replied: document.getElementById('repliedFilter').value
+      };
+
+      currentPage = 0;
+      fetchMessages();
+    });
+
+    // Clear filters button
+    document.getElementById('clearFilters').addEventListener('click', () => {
+      document.getElementById('searchText').value = '';
+      document.getElementById('phoneFilter').value = '';
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      document.getElementById('readFilter').value = 'all';
+      document.getElementById('repliedFilter').value = 'all';
+
+      currentFilters = {};
+      currentPage = 0;
+      fetchMessages();
+    });
+
+    // CSV Export
+    document.getElementById('exportCSV').addEventListener('click', async () => {
+      // Fetch ALL messages matching current filters (no pagination)
+      const params = new URLSearchParams({
+        ...currentFilters,
+        limit: 10000 // Reasonable max
+      });
+
+      // Remove empty params
+      for (const [key, value] of Array.from(params.entries())) {
+        if (!value || value === 'all') params.delete(key);
+      }
+
+      try {
+        const response = await fetch(\`/admin/messages/search?\${params}\`, {
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+        const messages = data.messages;
+
+        if (messages.length === 0) {
+          alert('No messages to export');
+          return;
+        }
+
+        // CSV Format
+        const csv = [
+          ['ID', 'Phone', 'Message', 'Timestamp', 'Read', 'Replied', 'Reply Text', 'Blocked'],
+          ...messages.map(m => [
+            m.id,
+            m.phone,
+            m.text.replace(/"/g, '""'),  // Escape quotes
+            new Date(m.timestamp).toISOString(),
+            m.read ? 'Yes' : 'No',
+            m.replied ? 'Yes' : 'No',
+            (m.reply_text || '').replace(/"/g, '""'),
+            m.is_blocked ? 'Yes' : 'No'
+          ])
+        ];
+
+        const csvContent = csv.map(row =>
+          row.map(cell => \`"\${cell}"\`).join(',')
+        ).join('\\n');
+
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = \`wyxr-messages-\${new Date().toISOString().split('T')[0]}.csv\`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        alert(\`Exported \${messages.length} messages to CSV\`);
+      } catch (error) {
+        console.error('Error exporting CSV:', error);
+        alert('Error exporting CSV');
+      }
+    });
+
+    // Load messages on page load
+    fetchMessages();
 
     // Block button - show modal
     document.addEventListener('click', (e) => {
