@@ -472,7 +472,6 @@ router.get('/messages', requireAuth, async (req, res) => {
       <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
       <button id="clearFilters" class="btn btn-secondary">Clear</button>
       <button id="exportCSV" class="btn btn-warning">Export CSV</button>
-      <a href="/" class="btn btn-primary">← Back to App</a>
     </div>
   </div>
 
