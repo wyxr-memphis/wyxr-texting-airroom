@@ -14,6 +14,13 @@ router.get('/messages', requireAuth, async (req, res) => {
 
     const messages = result.rows;
 
+    // Fetch blocked numbers
+    const blockedResult = await pool.query(
+      'SELECT phone, blocked_at, blocked_by, reason, notes FROM blocked_numbers ORDER BY blocked_at DESC'
+    );
+    const blockedNumbers = blockedResult.rows;
+    const blockedPhoneSet = new Set(blockedNumbers.map(b => b.phone));
+
     // Serve HTML page with all messages
     res.send(`
 <!DOCTYPE html>
@@ -121,6 +128,22 @@ router.get('/messages', requireAuth, async (req, res) => {
 
     .btn-danger:hover {
       background: #d12a5e;
+    }
+
+    .btn-warning {
+      background: #FFC629;
+      color: #2B2B2B;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+    }
+
+    .btn-warning:hover {
+      background: #e6b324;
+    }
+
+    .badge-blocked {
+      background: #666;
+      color: white;
     }
 
     .search-box {
@@ -291,6 +314,10 @@ router.get('/messages', requireAuth, async (req, res) => {
                 ${msg.replied ? '<span class="badge badge-replied">Replied</span>' : ''}
               </td>
               <td>
+                ${blockedPhoneSet.has(msg.phone)
+                  ? '<span class="badge badge-blocked">Blocked</span>'
+                  : `<button class="btn btn-warning block-btn" data-phone="${msg.phone}">Block</button>`
+                }
                 <button class="btn btn-danger delete-btn" data-id="${msg.id}">Delete</button>
               </td>
             </tr>
@@ -300,22 +327,163 @@ router.get('/messages', requireAuth, async (req, res) => {
     `}
   </div>
 
+  <div class="blocked-section" style="margin-top: 50px;">
+    <h2 style="color: #FFC629; margin-bottom: 20px;">Blocked Numbers (${blockedNumbers.length})</h2>
+    ${blockedNumbers.length === 0 ? `
+      <div class="no-messages">No blocked numbers</div>
+    ` : `
+      <div class="table-container">
+        <table id="blockedTable">
+          <thead>
+            <tr>
+              <th>Phone</th>
+              <th>Blocked At</th>
+              <th>Blocked By</th>
+              <th>Reason</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${blockedNumbers.map(block => `
+              <tr>
+                <td class="phone">${formatPhone(block.phone)}</td>
+                <td class="timestamp">${formatDate(block.blocked_at)}</td>
+                <td>${escapeHtml(block.blocked_by || 'N/A')}</td>
+                <td>${escapeHtml(block.reason || 'No reason')}</td>
+                <td>${escapeHtml(block.notes || '-')}</td>
+                <td>
+                  <button class="btn btn-primary unblock-btn" data-phone="${block.phone}">Unblock</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `}
+  </div>
+
+  <!-- Block Modal -->
+  <div id="blockModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8);">
+    <div style="background: #1a1a1a; margin: 10% auto; padding: 30px; border: 2px solid #E9407A; border-radius: 8px; width: 90%; max-width: 500px; color: white;">
+      <h2 style="color: #FFC629; margin-bottom: 20px;">Block Phone Number</h2>
+      <p>Phone: <span id="blockPhoneDisplay" style="color: #2B9EB3; font-weight: 600;"></span></p>
+      <label style="display: block; margin-top: 15px; color: #2B9EB3; font-weight: 600;">Reason (optional):</label>
+      <select id="blockReason" style="width: 100%; padding: 10px; background: #2B2B2B; border: 2px solid #2B9EB3; border-radius: 6px; color: white; margin-top: 5px;">
+        <option value="">Select a reason...</option>
+        <option value="Inappropriate content">Inappropriate content</option>
+        <option value="Spam">Spam</option>
+        <option value="Harassment">Harassment</option>
+        <option value="Other">Other</option>
+      </select>
+      <label style="display: block; margin-top: 15px; color: #2B9EB3; font-weight: 600;">Notes (optional):</label>
+      <textarea id="blockNotes" rows="3" style="width: 100%; padding: 10px; background: #2B2B2B; border: 2px solid #2B9EB3; border-radius: 6px; color: white; margin-top: 5px;"></textarea>
+      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn btn-danger" id="confirmBlock">Block Number</button>
+        <button class="btn btn-primary" id="cancelBlock">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Search functionality
     const searchBox = document.getElementById('searchBox');
     const table = document.getElementById('messagesTable');
+    const blockedTable = document.getElementById('blockedTable');
 
-    if (searchBox && table) {
+    if (searchBox) {
       searchBox.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
-        const rows = table.querySelectorAll('tbody tr');
 
-        rows.forEach(row => {
-          const text = row.textContent.toLowerCase();
-          row.style.display = text.includes(searchTerm) ? '' : 'none';
-        });
+        // Search messages table
+        if (table) {
+          const rows = table.querySelectorAll('tbody tr');
+          rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(searchTerm) ? '' : 'none';
+          });
+        }
+
+        // Search blocked numbers table
+        if (blockedTable) {
+          const rows = blockedTable.querySelectorAll('tbody tr');
+          rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(searchTerm) ? '' : 'none';
+          });
+        }
       });
     }
+
+    // Block button - show modal
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('block-btn')) {
+        const phone = e.target.dataset.phone;
+        document.getElementById('blockPhoneDisplay').textContent = phone;
+        document.getElementById('blockModal').style.display = 'block';
+        document.getElementById('blockModal').dataset.phone = phone;
+      }
+    });
+
+    // Cancel block
+    document.getElementById('cancelBlock').addEventListener('click', () => {
+      document.getElementById('blockModal').style.display = 'none';
+      document.getElementById('blockReason').value = '';
+      document.getElementById('blockNotes').value = '';
+    });
+
+    // Confirm block
+    document.getElementById('confirmBlock').addEventListener('click', async () => {
+      const phone = document.getElementById('blockModal').dataset.phone;
+      const reason = document.getElementById('blockReason').value;
+      const notes = document.getElementById('blockNotes').value;
+
+      try {
+        const response = await fetch('/admin/blocked-numbers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ phone, reason, notes })
+        });
+
+        if (response.ok) {
+          location.reload();
+        } else {
+          const data = await response.json();
+          alert(data.error || 'Failed to block number');
+        }
+      } catch (error) {
+        console.error('Error blocking number:', error);
+        alert('Error blocking number');
+      }
+    });
+
+    // Unblock button
+    document.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('unblock-btn')) {
+        const phone = e.target.dataset.phone;
+
+        if (!confirm('Unblock this number? Future messages will appear in DJ dashboard.')) {
+          return;
+        }
+
+        try {
+          const response = await fetch(\`/admin/blocked-numbers/\${encodeURIComponent(phone)}\`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+
+          if (response.ok) {
+            location.reload();
+          } else {
+            alert('Failed to unblock number');
+          }
+        } catch (error) {
+          console.error('Error unblocking number:', error);
+          alert('Error unblocking number');
+        }
+      }
+    });
 
     // Delete functionality
     document.addEventListener('click', async (e) => {
@@ -377,6 +545,77 @@ router.delete('/messages/:id', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error deleting message:', error);
     res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
+// GET /admin/blocked-numbers - Get all blocked numbers
+router.get('/blocked-numbers', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT phone, blocked_at, blocked_by, reason, notes
+      FROM blocked_numbers
+      ORDER BY blocked_at DESC
+    `);
+
+    res.json({ blockedNumbers: result.rows });
+  } catch (error) {
+    console.error('Error fetching blocked numbers:', error);
+    res.status(500).json({ error: 'Failed to fetch blocked numbers' });
+  }
+});
+
+// POST /admin/blocked-numbers - Block a phone number
+router.post('/blocked-numbers', requireAuth, async (req, res) => {
+  const { phone, reason, notes } = req.body;
+
+  if (!phone) {
+    return res.status(400).json({ error: 'Phone number is required' });
+  }
+
+  try {
+    // Check if already blocked
+    const existing = await pool.query(
+      'SELECT phone FROM blocked_numbers WHERE phone = $1',
+      [phone]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'Phone number is already blocked' });
+    }
+
+    // Insert into blocked_numbers
+    const result = await pool.query(
+      `INSERT INTO blocked_numbers (phone, blocked_by, reason, notes)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [phone, 'admin', reason || null, notes || null]
+    );
+
+    res.json({ success: true, blockedNumber: result.rows[0] });
+  } catch (error) {
+    console.error('Error blocking number:', error);
+    res.status(500).json({ error: 'Failed to block number' });
+  }
+});
+
+// DELETE /admin/blocked-numbers/:phone - Unblock a phone number
+router.delete('/blocked-numbers/:phone', requireAuth, async (req, res) => {
+  const { phone } = req.params;
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM blocked_numbers WHERE phone = $1 RETURNING *',
+      [phone]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Phone number not found in blocked list' });
+    }
+
+    res.json({ success: true, message: 'Phone number unblocked' });
+  } catch (error) {
+    console.error('Error unblocking number:', error);
+    res.status(500).json({ error: 'Failed to unblock number' });
   }
 });
 

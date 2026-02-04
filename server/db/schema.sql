@@ -28,11 +28,22 @@ CREATE TABLE IF NOT EXISTS session (
   expire TIMESTAMP(6) NOT NULL
 );
 
+-- Blocked numbers table for preventing messages from appearing in DJ dashboard
+CREATE TABLE IF NOT EXISTS blocked_numbers (
+  phone VARCHAR(20) PRIMARY KEY,
+  blocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  blocked_by VARCHAR(100),
+  reason TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(read);
 CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone);
 CREATE INDEX IF NOT EXISTS idx_session_expire ON session(expire);
+CREATE INDEX IF NOT EXISTS idx_blocked_numbers_phone ON blocked_numbers(phone);
 
 -- Trigger to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

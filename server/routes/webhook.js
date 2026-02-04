@@ -9,7 +9,14 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
   console.log('Incoming SMS:', { from: From, body: Body });
 
   try {
-    // Save message to database
+    // Check if phone number is blocked
+    const blockCheck = await pool.query(
+      'SELECT phone FROM blocked_numbers WHERE phone = $1',
+      [From]
+    );
+    const isBlocked = blockCheck.rows.length > 0;
+
+    // Save message to database (always store for staff review)
     const result = await pool.query(
       `INSERT INTO messages (phone, text, timestamp)
        VALUES ($1, $2, NOW())
@@ -19,10 +26,15 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
 
     const message = result.rows[0];
 
-    // Broadcast to all connected clients
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('message:new', message);
+    // Broadcast to DJs only if not blocked
+    if (!isBlocked) {
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('message:new', message);
+      }
+      console.log('Message broadcast to DJs');
+    } else {
+      console.log('Message blocked - stored in DB but not broadcast to DJs');
     }
 
     // Return empty TwiML response
