@@ -153,6 +153,32 @@ router.get('/messages', requireAuth, async (req, res) => {
     .header p {
       color: #E9407A;
       font-size: 1.1rem;
+      margin-bottom: 20px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .nav-link {
+      padding: 10px 20px;
+      background: #2B9EB3;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .nav-link:hover {
+      background: #248a9e;
+    }
+
+    .nav-link.active {
+      background: #FFC629;
+      color: #2B2B2B;
     }
 
     .stats {
@@ -426,6 +452,10 @@ router.get('/messages', requireAuth, async (req, res) => {
   <div class="header">
     <h1>WYXR 91.7 FM</h1>
     <p>Message History - Admin Panel</p>
+    <div class="nav-links">
+      <a href="/admin/messages" class="nav-link active">Messages</a>
+      <a href="/admin/contacts" class="nav-link">Contacts</a>
+    </div>
   </div>
 
   <div class="stats">
@@ -1027,6 +1057,336 @@ function formatDate(timestamp) {
     minute: '2-digit'
   });
 }
+
+// GET /admin/contacts - View all contacts and opt-in status
+router.get('/contacts', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        phone_number,
+        opted_in,
+        opt_in_method,
+        opt_in_timestamp,
+        pending_message,
+        pending_timestamp,
+        first_contact_timestamp,
+        last_message_timestamp,
+        opted_out,
+        opted_out_timestamp
+      FROM contacts
+      ORDER BY
+        CASE
+          WHEN opted_in = true THEN 1
+          WHEN opted_out = false AND opted_in = false THEN 2
+          WHEN opted_out = true THEN 3
+        END,
+        last_message_timestamp DESC NULLS LAST
+    `);
+
+    const contacts = result.rows;
+    const optedInCount = contacts.filter(c => c.opted_in).length;
+    const pendingCount = contacts.filter(c => !c.opted_in && !c.opted_out).length;
+    const optedOutCount = contacts.filter(c => c.opted_out).length;
+
+    // Format phone numbers for display
+    const formatPhone = (phone) => {
+      if (!phone) return '';
+      const cleaned = phone.replace(/\D/g, '');
+      if (cleaned.length === 11 && cleaned[0] === '1') {
+        const areaCode = cleaned.slice(1, 4);
+        const prefix = cleaned.slice(4, 7);
+        const line = cleaned.slice(7);
+        return `(${areaCode}) ${prefix}-${line}`;
+      }
+      return phone;
+    };
+
+    // Format timestamps
+    const formatTimestamp = (timestamp) => {
+      if (!timestamp) return 'Never';
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    };
+
+    // Serve HTML page
+    res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WYXR Contacts - Admin</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #2B2B2B;
+      color: #fff;
+      padding: 20px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #2B2B2B 0%, #1a1a1a 100%);
+      padding: 30px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      border: 2px solid #E9407A;
+    }
+
+    .header h1 {
+      color: #FFC629;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #E9407A;
+      font-size: 1.1rem;
+      margin-bottom: 20px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .nav-link {
+      padding: 10px 20px;
+      background: #2B9EB3;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .nav-link:hover {
+      background: #248a9e;
+    }
+
+    .nav-link.active {
+      background: #FFC629;
+      color: #2B2B2B;
+    }
+
+    .stats {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: #1a1a1a;
+      padding: 20px;
+      border-radius: 8px;
+      border: 2px solid #2B9EB3;
+      flex: 1;
+      min-width: 150px;
+    }
+
+    .stat-card h3 {
+      color: #2B9EB3;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .stat-card .number {
+      color: #FFC629;
+      font-size: 2rem;
+      font-weight: bold;
+    }
+
+    .contacts-table {
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid #2B9EB3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      background: #2B2B2B;
+      color: #FFC629;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid #2B9EB3;
+    }
+
+    td {
+      padding: 15px;
+      border-bottom: 1px solid #333;
+    }
+
+    tr:hover {
+      background: #252525;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .status-opted-in {
+      background: #4ade80;
+      color: #1a1a1a;
+    }
+
+    .status-pending {
+      background: #FFC629;
+      color: #1a1a1a;
+    }
+
+    .status-opted-out {
+      background: #ef4444;
+      color: white;
+    }
+
+    .method-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      background: #2B9EB3;
+      color: white;
+    }
+
+    .pending-message {
+      color: #888;
+      font-style: italic;
+      font-size: 0.9rem;
+      max-width: 300px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .timestamp {
+      color: #888;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 1200px) {
+      .contacts-table {
+        overflow-x: auto;
+      }
+
+      table {
+        min-width: 1000px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>WYXR 91.7 FM</h1>
+    <p>SMS Opt-In Contacts - Admin Panel</p>
+    <div class="nav-links">
+      <a href="/admin/messages" class="nav-link">Messages</a>
+      <a href="/admin/contacts" class="nav-link active">Contacts</a>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <h3>Total Contacts</h3>
+      <div class="number">${contacts.length}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Opted In</h3>
+      <div class="number">${optedInCount}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Pending</h3>
+      <div class="number">${pendingCount}</div>
+    </div>
+    <div class="stat-card">
+      <h3>Opted Out</h3>
+      <div class="number">${optedOutCount}</div>
+    </div>
+  </div>
+
+  <div class="contacts-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Phone Number</th>
+          <th>Status</th>
+          <th>Method</th>
+          <th>Opt-In Date</th>
+          <th>Pending Message</th>
+          <th>Last Contact</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${contacts.map(contact => {
+          let statusBadge = '';
+          if (contact.opted_in) {
+            statusBadge = '<span class="status-badge status-opted-in">✓ Opted In</span>';
+          } else if (contact.opted_out) {
+            statusBadge = '<span class="status-badge status-opted-out">✗ Opted Out</span>';
+          } else {
+            statusBadge = '<span class="status-badge status-pending">⏳ Pending</span>';
+          }
+
+          const methodBadge = contact.opt_in_method
+            ? `<span class="method-badge">${contact.opt_in_method.toUpperCase()}</span>`
+            : '';
+
+          const pendingMsg = contact.pending_message
+            ? `<div class="pending-message" title="${escapeHtml(contact.pending_message)}">${escapeHtml(contact.pending_message)}</div>`
+            : '<span class="timestamp">—</span>';
+
+          return `
+            <tr>
+              <td><strong>${formatPhone(contact.phone_number)}</strong></td>
+              <td>${statusBadge}</td>
+              <td>${methodBadge || '<span class="timestamp">—</span>'}</td>
+              <td><span class="timestamp">${formatTimestamp(contact.opt_in_timestamp)}</span></td>
+              <td>${pendingMsg}</td>
+              <td><span class="timestamp">${formatTimestamp(contact.last_message_timestamp)}</span></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // Auto-refresh every 30 seconds
+    setTimeout(() => {
+      location.reload();
+    }, 30000);
+  </script>
+</body>
+</html>
+    `);
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+    res.status(500).send('Error loading contacts');
+  }
+});
 
 function escapeHtml(text) {
   if (!text) return '';

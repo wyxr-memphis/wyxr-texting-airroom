@@ -3,11 +3,18 @@ const router = express.Router();
 const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
-// GET /api/messages - Get messages from last 12 hours (excluding blocked numbers)
+// GET /api/messages - Get messages from last 12 hours (excluding blocked numbers, including opt-in status)
 router.get('/messages', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT m.* FROM messages m
+      `SELECT
+         m.*,
+         c.opted_in,
+         c.opted_out,
+         c.pending_message,
+         c.opt_in_method
+       FROM messages m
+       LEFT JOIN contacts c ON m.phone = c.phone_number
        WHERE m.timestamp >= NOW() - INTERVAL '12 hours'
        AND NOT EXISTS (
          SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone
@@ -73,7 +80,33 @@ router.post('/messages/:id/reply', requireAuth, async (req, res) => {
 
     const message = messageResult.rows[0];
 
-    // Send SMS via Twilio
+    // Verify contact is opted-in before sending reply
+    const contactResult = await pool.query(
+      'SELECT * FROM contacts WHERE phone_number = $1',
+      [message.phone]
+    );
+
+    if (contactResult.rows.length === 0) {
+      return res.status(403).json({
+        error: 'Cannot reply: Contact has not opted in yet. Waiting for listener to confirm opt-in.'
+      });
+    }
+
+    const contact = contactResult.rows[0];
+
+    if (!contact.opted_in) {
+      return res.status(403).json({
+        error: 'Cannot reply: Contact has not opted in yet. Waiting for listener to confirm opt-in.'
+      });
+    }
+
+    if (contact.opted_out) {
+      return res.status(403).json({
+        error: 'Cannot reply: Contact has opted out of receiving messages.'
+      });
+    }
+
+    // Send SMS via Twilio (will fail until A2P approved)
     const twilioService = require('../services/twilio');
     await twilioService.sendSMS(message.phone, replyText);
 
@@ -87,6 +120,12 @@ router.post('/messages/:id/reply', requireAuth, async (req, res) => {
     );
 
     const updatedMessage = updateResult.rows[0];
+
+    // Update contact last message timestamp
+    await pool.query(
+      'UPDATE contacts SET last_message_timestamp = NOW() WHERE phone_number = $1',
+      [message.phone]
+    );
 
     // Broadcast update to all connected clients
     const io = req.app.get('io');
