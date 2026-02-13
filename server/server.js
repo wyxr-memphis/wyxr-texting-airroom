@@ -11,10 +11,17 @@ const setupWebSocket = require('./websocket/handlers');
 const app = express();
 const server = http.createServer(app);
 
+// Allowed CORS origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'https://wyxr.org',
+  'https://www.wyxr.org'
+];
+
 // Socket.io setup with session sharing
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true
   }
 });
@@ -26,7 +33,14 @@ if (process.env.NODE_ENV === 'production') {
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (Twilio webhooks, server-to-server, curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   exposedHeaders: ['set-cookie']
 }));
@@ -52,12 +66,14 @@ const messagesRoutes = require('./routes/messages');
 const settingsRoutes = require('./routes/settings');
 const webhookRoutes = require('./routes/webhook');
 const adminRoutes = require('./routes/admin');
+const webOptInRoutes = require('./routes/web-opt-in');
 
 app.use('/api', authRoutes);
 app.use('/api', messagesRoutes);
 app.use('/api', settingsRoutes);
 app.use('/webhook', webhookRoutes);
 app.use('/admin', adminRoutes);
+app.use('/api/sms', webOptInRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
