@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { sendSMS } = require('../services/twilio');
+const twilioService = require('../services/twilio');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter: 5 opt-in requests per IP per 15 minutes
@@ -12,8 +12,6 @@ const optInLimiter = rateLimit({
   legacyHeaders: false,
   message: { status: 'error', message: 'Too many requests. Please try again later.' }
 });
-
-const OPT_IN_REQUEST = 'Welcome to WYXR 91.7 FM! To chat with our DJs and get show updates, reply YES to confirm. Msg frequency varies. Msg&data rates may apply. Reply STOP to opt out, HELP for help. Privacy: wyxr.org/privacy';
 
 // POST /api/sms/web-opt-in - Public endpoint for website opt-in form
 router.post('/web-opt-in', optInLimiter, async (req, res) => {
@@ -71,10 +69,11 @@ router.post('/web-opt-in', optInLimiter, async (req, res) => {
         await pool.query(
           `INSERT INTO opt_in_log (phone_number, action_type, method, system_response, ip_address, consent_text, source_url)
            VALUES ($1, 'web_opt_in_request', 'web', $2, $3, $4, $5)`,
-          [phone_number, OPT_IN_REQUEST, ip_address, consent_text || null, source_url || null]
+          [phone_number, twilioService.MESSAGES.OPT_IN_REQUEST, ip_address, consent_text || null, source_url || null]
         );
 
-        await sendSMS(phone_number, OPT_IN_REQUEST);
+        // Send opt-in request (will fail gracefully if A2P not approved)
+        await twilioService.sendOptInRequest(phone_number);
 
         return res.json({
           status: 'ok',
@@ -101,10 +100,11 @@ router.post('/web-opt-in', optInLimiter, async (req, res) => {
     await pool.query(
       `INSERT INTO opt_in_log (phone_number, action_type, method, system_response, ip_address, consent_text, source_url)
        VALUES ($1, 'web_opt_in_request', 'web', $2, $3, $4, $5)`,
-      [phone_number, OPT_IN_REQUEST, ip_address, consent_text || null, source_url || null]
+      [phone_number, twilioService.MESSAGES.OPT_IN_REQUEST, ip_address, consent_text || null, source_url || null]
     );
 
-    await sendSMS(phone_number, OPT_IN_REQUEST);
+    // Send opt-in request (will fail gracefully if A2P not approved)
+    await twilioService.sendOptInRequest(phone_number);
 
     return res.json({
       status: 'ok',
