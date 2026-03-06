@@ -58,9 +58,10 @@ const GettingStarted = () => {
                   <div>
                     <h4>For You:</h4>
                     <ul>
-                      <li>Messages appear as cards on this screen</li>
-                      <li>Yellow cards = unread, gray cards = read</li>
-                      <li>Click "Mark Read" when you've seen a message</li>
+                      <li>Messages from the same listener are grouped into a single conversation thread</li>
+                      <li>Unread threads glow yellow with a pink border — read threads are gray</li>
+                      <li>Click "Mark All Read" on a thread when you've seen it</li>
+                      <li>The "Reply" button appears on threads where the listener has opted in</li>
                     </ul>
                   </div>
                 </div>
@@ -143,7 +144,7 @@ const GettingStarted = () => {
 
                 <h4>Message Management:</h4>
                 <ul>
-                  <li>Click "Mark Read" to keep track of what you've seen</li>
+                  <li>Click "Mark All Read" on a thread to clear it</li>
                   <li>The app shows messages from the last 12 hours</li>
                   <li>All messages are saved permanently for staff review</li>
                 </ul>
@@ -180,8 +181,8 @@ const GettingStarted = () => {
                 </div>
 
                 <div className="qa">
-                  <p><strong>Q: Can I reply yet?</strong></p>
-                  <p><strong>A:</strong> Not yet! SMS replies are coming soon (waiting on carrier approval). For now, just read and enjoy.</p>
+                  <p><strong>Q: Can I reply to listeners?</strong></p>
+                  <p><strong>A:</strong> Yes! If a listener has opted in to receive messages, you'll see a "Reply" button on their thread. Listeners opt in by replying YES to the automated welcome message when they first text.</p>
                 </div>
 
                 <div className="qa">

@@ -15,7 +15,7 @@ graph TB
 
     subgraph "Frontend - Vercel"
         Browser[🌐 Browser<br/>React App]
-        ReactComponents[⚛️ React Components<br/>- Header<br/>- MessageFeed<br/>- MessageCard<br/>- ReplyModal<br/>- Login]
+        ReactComponents[⚛️ React Components<br/>- Header<br/>- MessageFeed<br/>- ConversationThread<br/>- ReplyModal<br/>- Login]
         SocketClient[🔌 Socket.io Client<br/>WebSocket Connection]
         APIClient[📡 API Service<br/>HTTP Requests]
     end
@@ -141,7 +141,7 @@ graph TB
 
 ### External Services
 - **SMS Gateway**: Twilio
-- **A2P Registration**: Twilio 10DLC (Pending approval)
+- **A2P Registration**: Twilio 10DLC (Approved March 5, 2026)
 - **Version Control**: GitHub (Public repo)
 
 ---
@@ -191,7 +191,7 @@ graph TB
            └──────────────────────┘
 ```
 
-### 2. DJ Reply Flow (When A2P Approved)
+### 2. DJ Reply Flow (A2P Approved — Live)
 
 ```
 ┌──────────────────┐
@@ -303,9 +303,11 @@ wyxr-texting-airroom/
 │   │   ├── components/
 │   │   │   ├── Header.jsx          # Top navigation with listener info
 │   │   │   ├── Header.css
-│   │   │   ├── MessageFeed.jsx     # Grid container for messages
+│   │   │   ├── MessageFeed.jsx     # Grid container; groups messages into conversations
 │   │   │   ├── MessageFeed.css
-│   │   │   ├── MessageCard.jsx     # Individual message card
+│   │   │   ├── ConversationThread.jsx  # Threaded card per listener
+│   │   │   ├── ConversationThread.css
+│   │   │   ├── MessageCard.jsx     # Legacy individual card (unused in feed)
 │   │   │   ├── MessageCard.css
 │   │   │   ├── ReplyModal.jsx      # Reply interface
 │   │   │   ├── ReplyModal.css
@@ -629,8 +631,8 @@ Developer
 
 ---
 
-**Last Updated:** January 30, 2026
+**Last Updated:** March 6, 2026
 
-**Version:** 1.0.0
+**Version:** 1.2.0
 
 **Status:** Production - Deployed and operational

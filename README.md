@@ -13,9 +13,10 @@ Real-time text messaging application for WYXR radio station. Listeners text a de
 ## Features
 
 - **Real-time Messaging**: WebSocket-powered instant message delivery
-- **24-Hour Display Window**: Shows messages from the last 24 hours only (stored permanently)
-- **Read/Unread Tracking**: Visual distinction between read and unread messages
-- **SMS Integration**: Send and receive SMS via Twilio
+- **Conversation Threading**: Messages from the same listener grouped into a single thread, sorted by most recent activity
+- **12-Hour Display Window**: Shows messages from the last 12 hours only (stored permanently)
+- **Read/Unread Tracking**: Unread threads glow yellow with pink border; read threads are gray
+- **SMS Replies**: DJs can reply to listeners who have opted in (A2P 10DLC approved)
 - **Power Toggle**: Turn messaging on/off
 - **Quick Reply Templates**: 4 predefined response templates
 - **Simple Authentication**: Universal username/password login
@@ -27,7 +28,7 @@ Real-time text messaging application for WYXR radio station. Listeners text a de
 - **Backend**: Node.js, Express, Socket.io, Twilio SDK
 - **Database**: PostgreSQL
 - **Authentication**: Express-session with PostgreSQL store
-- **Deployment**: Railway (backend + PostgreSQL) + Vercel (frontend)
+- **Deployment**: Render.com (backend + PostgreSQL) + Vercel (frontend)
 
 ## Project Structure
 
@@ -252,7 +253,7 @@ After deploying frontend to Vercel:
 - `POST /api/logout` - Logout
 
 ### Messages
-- `GET /api/messages` - Get messages from last 24 hours
+- `GET /api/messages` - Get messages from last 12 hours
 - `PATCH /api/messages/:id/read` - Toggle read status
 - `POST /api/messages/:id/reply` - Send SMS reply
 
@@ -276,9 +277,9 @@ After deploying frontend to Vercel:
 ## Usage
 
 1. **Login**: Enter credentials to access the dashboard
-2. **View Messages**: All messages from the last 24 hours are displayed in a grid
-3. **Mark Read/Unread**: Click on any message card to toggle read status
-4. **Reply to Message**: Click the phone number to open reply modal
+2. **View Messages**: Messages from the last 12 hours, grouped by listener into conversation threads
+3. **Mark All Read**: Click "Mark All Read" on a thread to clear all unread messages in it
+4. **Reply to Message**: Click "Reply" on any thread where the listener has opted in
 5. **Quick Replies**: Use predefined templates or write custom reply
 6. **Power Toggle**: Turn messaging on/off using the power button in header
 
@@ -300,7 +301,7 @@ After deploying frontend to Vercel:
 - Verify Twilio credentials in environment variables
 - Check Twilio webhook is set correctly
 - Check Twilio phone number is active
-- Review Railway logs for errors
+- Review Render logs for errors
 
 ### Database connection issues
 - Verify `DATABASE_URL` is correct
@@ -319,7 +320,7 @@ After deploying frontend to Vercel:
 
 ## Development Notes
 
-- Messages are permanently stored but only displayed if within 24 hours
+- Messages are permanently stored but only displayed if within 12 hours
 - Session persists for 30 days
 - WebSocket automatically reconnects on disconnect
 - All timestamps are stored in UTC
@@ -327,7 +328,7 @@ After deploying frontend to Vercel:
 
 ## License
 
-Private project for WYXR 91.7 FM
+Private project for WYXR 91.7FM
 
 ## Support
 

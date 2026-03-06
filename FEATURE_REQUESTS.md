@@ -6,9 +6,9 @@ This document tracks potential features and enhancements for the WYXR Listener T
 
 ## Priority 1: Critical Features
 
-### 1. Enable SMS Reply Functionality (Blocked - Waiting on A2P Approval)
+### 1. Enable SMS Reply Functionality
 
-**Status:** ⏳ Pending A2P 10DLC Registration Approval (1-2 weeks)
+**Status:** ✅ Live — A2P 10DLC Approved March 5, 2026
 
 **Description:**
 Currently, DJs can see incoming text messages but cannot send replies. The reply functionality is fully implemented in the code but blocked by Twilio until A2P 10DLC registration is approved.
@@ -20,12 +20,12 @@ Currently, DJs can see incoming text messages but cannot send replies. The reply
 - ✅ Twilio integration configured
 - ✅ Message state updates after reply
 
-**Next Steps (Once A2P Approved):**
-1. Verify A2P campaign status in Twilio Console
-2. Test SMS sending with a test message
-3. Confirm replies appear in listener's phone
-4. Train DJs on reply functionality
-5. Monitor message delivery rates
+**Completed Steps:**
+1. ✅ A2P campaign approved in Twilio Console (March 5, 2026)
+2. ✅ Reply button enabled in ConversationThread component
+3. ✅ SMS replies sending and delivering to listeners
+4. ✅ DJs can use quick reply templates or custom text
+5. ✅ Monitoring message delivery rates via Twilio console
 
 **Testing Checklist:**
 - [ ] Send reply from DJ dashboard
@@ -42,7 +42,7 @@ Currently, DJs can see incoming text messages but cannot send replies. The reply
 
 ### 1b. SMS Auto-Reply Opt-In System (TCPA/A2P Compliance)
 
-**Status:** 📋 Specification Complete - Waiting on A2P Approval
+**Status:** ✅ Implemented — Live in Production
 
 **Description:**
 Implement automated two-stage opt-in flow that requests explicit consent before enabling DJ replies, ensuring full TCPA and A2P 10DLC compliance. When a listener texts WYXR for the first time, DJs cannot legally reply without explicit prior consent. Receiving a text FROM someone does not grant permission to text them back under TCPA regulations.
@@ -375,12 +375,12 @@ CREATE INDEX idx_opt_in_log_timestamp ON opt_in_log(timestamp);
 
 #### Integration with Existing Reply Functionality
 
-**Current State (Commented Out):**
-- Reply button hidden in `MessageCard.jsx`
-- Reply modal and backend endpoints fully implemented
-- Waiting on A2P approval to enable
+**Current State:**
+- Reply button shown in `ConversationThread.jsx` only for opted-in contacts
+- Reply modal and backend endpoints fully implemented and live
+- A2P approved, SMS replies sending successfully
 
-**Future State (With Opt-In System):**
+**Integration Points:**
 - Reply button shown ONLY for opted-in contacts
 - Pending contacts see "Waiting for opt-in" status
 - Backend validates opt-in status before sending ANY reply
@@ -409,8 +409,7 @@ CREATE INDEX idx_opt_in_log_timestamp ON opt_in_log(timestamp);
 #### Dependencies & Blockers
 
 **Blockers:**
-- ⏳ A2P 10DLC approval from Twilio (1-2 weeks)
-- ⏳ Cannot test SMS sending until A2P approved
+- ✅ A2P 10DLC approved March 5, 2026 — no remaining blockers
 
 **Dependencies:**
 - Existing Twilio integration (already configured)
@@ -700,4 +699,4 @@ Have a feature idea? Add it to this document or discuss with the development tea
 
 ---
 
-**Last Updated:** February 3, 2026
+**Last Updated:** March 6, 2026
