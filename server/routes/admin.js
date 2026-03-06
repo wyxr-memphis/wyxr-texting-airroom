@@ -1462,14 +1462,14 @@ router.get('/contacts', requireAuth, async (req, res) => {
         const response = await fetch('/admin/blocked-numbers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, reason, notes, blocked_by: 'admin' }),
+          body: JSON.stringify({ phone, reason, notes }),
           credentials: 'include'
         });
-        const data = await response.json();
         if (response.ok) {
           document.getElementById('contactBlockModal').style.display = 'none';
           location.reload();
         } else {
+          const data = await response.json();
           alert(data.error || 'Failed to block number');
         }
       } catch (error) {
