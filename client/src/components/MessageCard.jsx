@@ -1,12 +1,17 @@
 import React from 'react';
 import { formatPhoneNumber, formatTime } from '../utils/formatters';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, MessageSquare } from 'lucide-react';
 import './MessageCard.css';
 
-const MessageCard = ({ message, onMarkRead }) => {
+const MessageCard = ({ message, onMarkRead, onReply }) => {
   const handleMarkRead = (e) => {
     e.stopPropagation();
     onMarkRead(message.id, !message.read);
+  };
+
+  const handleReply = (e) => {
+    e.stopPropagation();
+    onReply(message);
   };
 
   return (
@@ -38,17 +43,16 @@ const MessageCard = ({ message, onMarkRead }) => {
           <span>{message.read ? 'Mark Unread' : 'Mark Read'}</span>
         </button>
 
-        {/* Reply button hidden until A2P approval */}
-        {/*
-        <button
-          className="action-btn reply-btn"
-          onClick={handleReply}
-          title="Reply to this message"
-        >
-          <MessageSquare size={16} />
-          <span>Reply</span>
-        </button>
-        */}
+        {message.opted_in && (
+          <button
+            className="action-btn reply-btn"
+            onClick={handleReply}
+            title="Reply to this message"
+          >
+            <MessageSquare size={16} />
+            <span>Reply</span>
+          </button>
+        )}
       </div>
     </div>
   );

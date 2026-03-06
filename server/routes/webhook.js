@@ -10,11 +10,11 @@ const isYesKeyword = (text) => {
 };
 
 const isStopKeyword = (text) => {
-  return text.trim().toLowerCase() === 'stop';
+  return ['stop', 'stopall', 'unsubscribe', 'cancel', 'end', 'quit', 'optout', 'revoke'].includes(text.trim().toLowerCase());
 };
 
 const isHelpKeyword = (text) => {
-  return text.trim().toLowerCase() === 'help';
+  return ['help', 'info'].includes(text.trim().toLowerCase());
 };
 
 // Log opt-in action to audit log
@@ -83,7 +83,7 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
           [From]
         );
       }
-      await twilioService.sendOptOutConfirmation(From);
+      // Twilio automatically sends opt-out confirmation for STOP keywords - do not send manually
       await logOptInAction(From, 'opt_out', 'sms', Body, twilioService.MESSAGES.OPT_OUT_CONFIRMATION);
       console.log('Contact opted out:', From);
       res.type('text/xml');
@@ -93,7 +93,7 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
 
     // Handle HELP keyword
     if (isHelpKeyword(Body)) {
-      await twilioService.sendHelpResponse(From);
+      // Twilio automatically sends help response for HELP/INFO keywords - do not send manually
       await logOptInAction(From, 'help_request', 'sms', Body, twilioService.MESSAGES.HELP_RESPONSE);
       console.log('Help response sent to:', From);
       res.type('text/xml');

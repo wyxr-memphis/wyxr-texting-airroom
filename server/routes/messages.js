@@ -106,7 +106,7 @@ router.post('/messages/:id/reply', requireAuth, async (req, res) => {
       });
     }
 
-    // Send SMS via Twilio (will fail until A2P approved)
+    // Send SMS via Twilio
     const twilioService = require('../services/twilio');
     await twilioService.sendSMS(message.phone, replyText);
 

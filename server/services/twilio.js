@@ -7,8 +7,8 @@ const client = twilio(
 
 // Automated message templates (TCPA/A2P compliant)
 const MESSAGES = {
-  OPT_IN_REQUEST: 'Welcome to WYXR 91.7 FM! To chat with our DJs and get show updates, reply YES to confirm. Msg frequency varies. Msg&data rates may apply. Reply STOP to opt out, HELP for help. Privacy: wyxr.org/privacy',
-  OPT_IN_CONFIRMATION: "You're all set! Our DJs can now respond to your texts. You'll also get program updates & community alerts from WYXR 91.7 FM. Msg frequency varies. Reply STOP anytime to opt out. wyxr.org",
+  OPT_IN_REQUEST: "WYXR 91.7 FM: You've requested msgs from WYXR. Reply YES to confirm. Msg freq varies. Msg&data rates may apply. STOP to opt out. Help: wyxr.org/privacy-policy/",
+  OPT_IN_CONFIRMATION: "WYXR 91.7 FM: Welcome! You're now connected with our DJs. Text song requests anytime during live shows. Reply STOP to opt out. Msg&data rates may apply. Privacy: wyxr.org/privacy-policy/",
   OPT_IN_REMINDER: 'Hey! To chat with WYXR DJs, please reply YES to confirm. Thanks!',
   OPT_OUT_CONFIRMATION: "WYXR 91.7 FM: You're unsubscribed. No more messages will be sent. You can still listen at wyxr.org! Reply START to rejoin anytime.",
   ALREADY_OPTED_IN: "You're all set! You're already receiving WYXR messages.",
