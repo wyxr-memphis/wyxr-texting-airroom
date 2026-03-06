@@ -145,7 +145,7 @@ const GettingStarted = () => {
                 <h4>Message Management:</h4>
                 <ul>
                   <li>Click "Mark All Read" on a thread to clear it</li>
-                  <li>The app shows messages from the last 12 hours</li>
+                  <li>The app shows messages from the last 2 hours</li>
                   <li>All messages are saved permanently for staff review</li>
                 </ul>
 

@@ -50,7 +50,7 @@ const MessageFeed = ({ messages, messagingEnabled, onMarkRead, onReply }) => {
       <div className="message-feed-empty">
         <div className="empty-message">
           <h2>No messages yet</h2>
-          <p>Messages from the last 12 hours will appear here</p>
+          <p>Messages from the last 2 hours will appear here</p>
         </div>
       </div>
     );

@@ -3,7 +3,7 @@ const router = express.Router();
 const pool = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 
-// GET /api/messages - Get messages from last 12 hours (excluding blocked numbers, including opt-in status)
+// GET /api/messages - Get messages from last 2 hours (excluding blocked numbers, including opt-in status)
 router.get('/messages', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
@@ -15,7 +15,7 @@ router.get('/messages', requireAuth, async (req, res) => {
          c.opt_in_method
        FROM messages m
        LEFT JOIN contacts c ON m.phone = c.phone_number
-       WHERE m.timestamp >= NOW() - INTERVAL '12 hours'
+       WHERE m.timestamp >= NOW() - INTERVAL '2 hours'
        AND NOT EXISTS (
          SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone
        )

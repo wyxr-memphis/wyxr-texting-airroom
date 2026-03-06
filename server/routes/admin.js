@@ -1063,24 +1063,26 @@ router.get('/contacts', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        phone_number,
-        opted_in,
-        opt_in_method,
-        opt_in_timestamp,
-        pending_message,
-        pending_timestamp,
-        first_contact_timestamp,
-        last_message_timestamp,
-        opted_out,
-        opted_out_timestamp
-      FROM contacts
+        c.phone_number,
+        c.opted_in,
+        c.opt_in_method,
+        c.opt_in_timestamp,
+        c.pending_message,
+        c.pending_timestamp,
+        c.first_contact_timestamp,
+        c.last_message_timestamp,
+        c.opted_out,
+        c.opted_out_timestamp,
+        CASE WHEN b.phone IS NOT NULL THEN true ELSE false END as is_blocked
+      FROM contacts c
+      LEFT JOIN blocked_numbers b ON c.phone_number = b.phone
       ORDER BY
         CASE
-          WHEN opted_in = true THEN 1
-          WHEN opted_out = false AND opted_in = false THEN 2
-          WHEN opted_out = true THEN 3
+          WHEN c.opted_in = true THEN 1
+          WHEN c.opted_out = false AND c.opted_in = false THEN 2
+          WHEN c.opted_out = true THEN 3
         END,
-        last_message_timestamp DESC NULLS LAST
+        c.last_message_timestamp DESC NULLS LAST
     `);
 
     const contacts = result.rows;
@@ -1287,6 +1289,37 @@ router.get('/contacts', requireAuth, async (req, res) => {
       font-size: 0.85rem;
     }
 
+    .status-blocked {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .btn-block-contact {
+      padding: 6px 14px;
+      background: #b45309;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-block-contact:hover {
+      background: #92400e;
+    }
+
+    .badge-blocked-contact {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #7f1d1d;
+      color: #fca5a5;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
     @media (max-width: 1200px) {
       .contacts-table {
         overflow-x: auto;
@@ -1337,6 +1370,7 @@ router.get('/contacts', requireAuth, async (req, res) => {
           <th>Opt-In Date</th>
           <th>Pending Message</th>
           <th>Last Contact</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -1358,6 +1392,10 @@ router.get('/contacts', requireAuth, async (req, res) => {
             ? `<div class="pending-message" title="${escapeHtml(contact.pending_message)}">${escapeHtml(contact.pending_message)}</div>`
             : '<span class="timestamp">—</span>';
 
+          const blockAction = contact.is_blocked
+            ? `<span class="badge-blocked-contact">Blocked</span>`
+            : `<button class="btn-block-contact contact-block-btn" data-phone="${contact.phone_number}">Block</button>`;
+
           return `
             <tr>
               <td><strong>${formatPhone(contact.phone_number)}</strong></td>
@@ -1366,6 +1404,7 @@ router.get('/contacts', requireAuth, async (req, res) => {
               <td><span class="timestamp">${formatTimestamp(contact.opt_in_timestamp)}</span></td>
               <td>${pendingMsg}</td>
               <td><span class="timestamp">${formatTimestamp(contact.last_message_timestamp)}</span></td>
+              <td>${blockAction}</td>
             </tr>
           `;
         }).join('')}
@@ -1373,11 +1412,70 @@ router.get('/contacts', requireAuth, async (req, res) => {
     </table>
   </div>
 
+  <!-- Block Modal -->
+  <div id="contactBlockModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8);">
+    <div style="background: #1a1a1a; border: 2px solid #E9407A; border-radius: 8px; padding: 30px; max-width: 500px; margin: 100px auto;">
+      <h2 style="color: #FFC629; margin-bottom: 20px;">Block Phone Number</h2>
+      <p>Phone: <span id="contactBlockPhoneDisplay" style="color: #2B9EB3; font-weight: 600;"></span></p>
+      <label style="display: block; margin-top: 15px; color: #2B9EB3; font-weight: 600;">Reason (optional):</label>
+      <select id="contactBlockReason" style="width: 100%; padding: 10px; background: #2B2B2B; border: 2px solid #2B9EB3; border-radius: 6px; color: white; margin-top: 5px;">
+        <option value="">Select reason...</option>
+        <option value="Inappropriate content">Inappropriate content</option>
+        <option value="Spam">Spam</option>
+        <option value="Harassment">Harassment</option>
+        <option value="Other">Other</option>
+      </select>
+      <label style="display: block; margin-top: 15px; color: #2B9EB3; font-weight: 600;">Notes (optional):</label>
+      <textarea id="contactBlockNotes" rows="3" style="width: 100%; padding: 10px; background: #2B2B2B; border: 2px solid #2B9EB3; border-radius: 6px; color: white; margin-top: 5px;"></textarea>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button style="flex: 1; padding: 12px; background: #dc2626; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;" id="contactConfirmBlock">Block Number</button>
+        <button style="flex: 1; padding: 12px; background: #2B9EB3; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;" id="contactCancelBlock">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Auto-refresh every 30 seconds
-    setTimeout(() => {
-      location.reload();
-    }, 30000);
+    setTimeout(() => { location.reload(); }, 30000);
+
+    // Block button handler
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('contact-block-btn')) {
+        const phone = e.target.dataset.phone;
+        document.getElementById('contactBlockPhoneDisplay').textContent = phone;
+        document.getElementById('contactBlockModal').style.display = 'block';
+        document.getElementById('contactBlockModal').dataset.phone = phone;
+      }
+    });
+
+    document.getElementById('contactCancelBlock').addEventListener('click', () => {
+      document.getElementById('contactBlockModal').style.display = 'none';
+      document.getElementById('contactBlockReason').value = '';
+      document.getElementById('contactBlockNotes').value = '';
+    });
+
+    document.getElementById('contactConfirmBlock').addEventListener('click', async () => {
+      const phone = document.getElementById('contactBlockModal').dataset.phone;
+      const reason = document.getElementById('contactBlockReason').value;
+      const notes = document.getElementById('contactBlockNotes').value;
+      try {
+        const response = await fetch('/admin/blocked-numbers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, reason, notes, blocked_by: 'admin' }),
+          credentials: 'include'
+        });
+        const data = await response.json();
+        if (response.ok) {
+          document.getElementById('contactBlockModal').style.display = 'none';
+          location.reload();
+        } else {
+          alert(data.error || 'Failed to block number');
+        }
+      } catch (error) {
+        alert('Error blocking number');
+      }
+    });
   </script>
 </body>
 </html>
