@@ -1310,14 +1310,21 @@ router.get('/contacts', requireAuth, async (req, res) => {
       background: #92400e;
     }
 
-    .badge-blocked-contact {
-      display: inline-block;
-      padding: 4px 10px;
-      background: #7f1d1d;
-      color: #fca5a5;
+    .btn-unblock-contact {
+      padding: 6px 14px;
+      background: #374151;
+      color: #9ca3af;
+      border: 1px solid #4b5563;
       border-radius: 6px;
       font-size: 0.8rem;
       font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-unblock-contact:hover {
+      background: #4b5563;
+      color: white;
     }
 
     @media (max-width: 1200px) {
@@ -1393,7 +1400,7 @@ router.get('/contacts', requireAuth, async (req, res) => {
             : '<span class="timestamp">—</span>';
 
           const blockAction = contact.is_blocked
-            ? `<span class="badge-blocked-contact">Blocked</span>`
+            ? `<button class="btn-unblock-contact contact-unblock-btn" data-phone="${contact.phone_number}">Unblock</button>`
             : `<button class="btn-block-contact contact-block-btn" data-phone="${contact.phone_number}">Block</button>`;
 
           return `
@@ -1445,6 +1452,28 @@ router.get('/contacts', requireAuth, async (req, res) => {
         document.getElementById('contactBlockPhoneDisplay').textContent = phone;
         document.getElementById('contactBlockModal').style.display = 'block';
         document.getElementById('contactBlockModal').dataset.phone = phone;
+      }
+    });
+
+    // Unblock button handler
+    document.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('contact-unblock-btn')) {
+        const phone = e.target.dataset.phone;
+        if (!confirm('Unblock this number? Future messages will appear in the DJ dashboard.')) return;
+        try {
+          const response = await fetch('/admin/blocked-numbers/' + encodeURIComponent(phone), {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+          if (response.ok) {
+            location.reload();
+          } else {
+            const data = await response.json();
+            alert(data.error || 'Failed to unblock number');
+          }
+        } catch (error) {
+          alert('Error unblocking number');
+        }
       }
     });
 
