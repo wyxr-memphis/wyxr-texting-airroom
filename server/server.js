@@ -14,6 +14,7 @@ const server = http.createServer(app);
 // Allowed CORS origins
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
+  'https://wyxr-texting-airroom.onrender.com',
   'https://wyxr.org',
   'https://www.wyxr.org'
 ];
