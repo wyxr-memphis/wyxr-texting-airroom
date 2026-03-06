@@ -1,6 +1,37 @@
 import React from 'react';
-import MessageCard from './MessageCard';
+import ConversationThread from './ConversationThread';
 import './MessageFeed.css';
+
+const groupIntoConversations = (messages) => {
+  const groups = {};
+
+  messages.forEach((msg) => {
+    if (!groups[msg.phone]) {
+      groups[msg.phone] = [];
+    }
+    groups[msg.phone].push(msg);
+  });
+
+  return Object.entries(groups).map(([phone, msgs]) => {
+    const sorted = [...msgs].sort(
+      (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+    );
+    const unread = sorted.filter(m => !m.read);
+    const opted_in = sorted.some(m => m.opted_in === true);
+    const latestTimestamp = sorted[sorted.length - 1].timestamp;
+
+    return {
+      phone,
+      messages: sorted,
+      hasUnread: unread.length > 0,
+      unreadCount: unread.length,
+      opted_in,
+      latestTimestamp,
+    };
+  }).sort(
+    (a, b) => new Date(b.latestTimestamp) - new Date(a.latestTimestamp)
+  );
+};
 
 const MessageFeed = ({ messages, messagingEnabled, onMarkRead, onReply }) => {
   if (!messagingEnabled) {
@@ -25,13 +56,15 @@ const MessageFeed = ({ messages, messagingEnabled, onMarkRead, onReply }) => {
     );
   }
 
+  const conversations = groupIntoConversations(messages);
+
   return (
     <div className="message-feed">
       <div className="message-grid">
-        {messages.map((message) => (
-          <MessageCard
-            key={message.id}
-            message={message}
+        {conversations.map((conversation) => (
+          <ConversationThread
+            key={conversation.phone}
+            conversation={conversation}
             onMarkRead={onMarkRead}
             onReply={onReply}
           />

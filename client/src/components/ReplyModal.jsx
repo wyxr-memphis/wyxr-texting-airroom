@@ -4,10 +4,10 @@ import { formatPhoneNumber } from '../utils/formatters';
 import './ReplyModal.css';
 
 const QUICK_REPLIES = [
-  "Thanks for listening to WYXR 91.7!",
+  "Thanks for listening to WYXR 91.7FM!",
   "We'll play your request soon!",
   "Thanks for your feedback!",
-  "Stay tuned to WYXR 91.7!"
+  "Stay tuned to WYXR 91.7FM!"
 ];
 
 const ReplyModal = ({ message, onClose, onSend }) => {

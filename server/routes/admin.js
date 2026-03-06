@@ -450,7 +450,7 @@ router.get('/messages', requireAuth, async (req, res) => {
 </head>
 <body>
   <div class="header">
-    <h1>WYXR 91.7 FM</h1>
+    <h1>WYXR 91.7FM</h1>
     <p>Message History - Admin Panel</p>
     <div class="nav-links">
       <a href="/admin/messages" class="nav-link active">Messages</a>
@@ -1300,7 +1300,7 @@ router.get('/contacts', requireAuth, async (req, res) => {
 </head>
 <body>
   <div class="header">
-    <h1>WYXR 91.7 FM</h1>
+    <h1>WYXR 91.7FM</h1>
     <p>SMS Opt-In Contacts - Admin Panel</p>
     <div class="nav-links">
       <a href="/admin/messages" class="nav-link">Messages</a>

@@ -25,7 +25,7 @@ const Login = ({ onLogin }) => {
     <div className="login-container">
       <div className="login-box">
         <div className="login-header">
-          <h1>WYXR 91.7 FM</h1>
+          <h1>WYXR 91.7FM</h1>
           <p>Text Message Dashboard</p>
         </div>
 
