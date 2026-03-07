@@ -67,8 +67,10 @@ router.get('/messages/search', requireAuth, async (req, res) => {
 
     const query = `
       SELECT m.*,
-             EXISTS(SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone) as is_blocked
+             EXISTS(SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone) as is_blocked,
+             COALESCE(c.opted_in, false) as opted_in
       FROM messages m
+      LEFT JOIN contacts c ON m.phone = c.phone_number
       WHERE ${conditions.join(' AND ')}
       ORDER BY m.timestamp DESC
       LIMIT $${paramCount} OFFSET $${paramCount + 1}
@@ -100,9 +102,11 @@ router.get('/messages/search', requireAuth, async (req, res) => {
 router.get('/messages', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT id, phone, text, timestamp, read, replied, reply_text, replied_at, created_at
-      FROM messages
-      ORDER BY timestamp DESC
+      SELECT m.id, m.phone, m.text, m.timestamp, m.read, m.replied, m.reply_text, m.replied_at, m.created_at,
+             COALESCE(c.opted_in, false) as opted_in
+      FROM messages m
+      LEFT JOIN contacts c ON m.phone = c.phone_number
+      ORDER BY m.timestamp DESC
     `);
 
     const messages = result.rows;
@@ -272,6 +276,35 @@ router.get('/messages', requireAuth, async (req, res) => {
     .badge-blocked {
       background: #666;
       color: white;
+    }
+
+    .btn-reply {
+      background: #2B9EB3;
+      color: white;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+    }
+
+    .btn-reply:hover {
+      background: #247a8a;
+    }
+
+    .btn-read-toggle {
+      background: #555;
+      color: white;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+    }
+
+    .btn-read-toggle:hover {
+      background: #444;
+    }
+
+    .action-cell {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
     }
 
     .filter-panel {
@@ -537,11 +570,15 @@ router.get('/messages', requireAuth, async (req, res) => {
                 ${msg.replied ? '<span class="badge badge-replied">Replied</span>' : ''}
               </td>
               <td>
-                ${blockedPhoneSet.has(msg.phone)
-                  ? '<span class="badge badge-blocked">Blocked</span>'
-                  : `<button class="btn btn-warning block-btn" data-phone="${msg.phone}">Block</button>`
-                }
-                <button class="btn btn-danger delete-btn" data-id="${msg.id}">Delete</button>
+                <div class="action-cell">
+                  <button class="btn btn-read-toggle read-toggle-btn" data-id="${msg.id}" data-read="${msg.read}">${msg.read ? 'Mark Unread' : 'Mark Read'}</button>
+                  ${msg.opted_in ? `<button class="btn btn-reply reply-btn" data-id="${msg.id}" data-phone="${msg.phone}" data-text="${escapeHtml(msg.text)}">Reply</button>` : ''}
+                  ${blockedPhoneSet.has(msg.phone)
+                    ? '<span class="badge badge-blocked">Blocked</span>'
+                    : `<button class="btn btn-warning block-btn" data-phone="${msg.phone}">Block</button>`
+                  }
+                  <button class="btn btn-danger delete-btn" data-id="${msg.id}">Delete</button>
+                </div>
               </td>
             </tr>
           `).join('')}
@@ -608,6 +645,32 @@ router.get('/messages', requireAuth, async (req, res) => {
     </div>
   </div>
 
+  <!-- Reply Modal -->
+  <div id="replyModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8);">
+    <div style="background: #1a1a1a; margin: 8% auto; padding: 30px; border: 2px solid #2B9EB3; border-radius: 8px; width: 90%; max-width: 540px; color: white;">
+      <h2 style="color: #FFC629; margin-bottom: 6px;">Reply to <span id="replyPhoneDisplay" style="color: #2B9EB3;"></span></h2>
+      <div style="color: #999; font-size: 0.9rem; margin-bottom: 16px; background: #2B2B2B; padding: 10px 14px; border-radius: 6px; border-left: 3px solid #E9407A;">
+        <span style="font-size: 0.75rem; text-transform: uppercase; color: #E9407A; font-weight: 600;">Original message:</span><br>
+        <span id="replyOriginalText" style="color: #ccc;"></span>
+      </div>
+      <div style="margin-bottom: 14px;">
+        <div style="font-size: 0.8rem; color: #2B9EB3; font-weight: 600; margin-bottom: 8px; text-transform: uppercase;">Quick replies:</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          <button class="quick-reply-opt" style="padding: 6px 12px; background: #2B2B2B; border: 1px solid #2B9EB3; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 0.85rem;">Thanks for listening to WYXR 91.7FM!</button>
+          <button class="quick-reply-opt" style="padding: 6px 12px; background: #2B2B2B; border: 1px solid #2B9EB3; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 0.85rem;">We'll play your request soon!</button>
+          <button class="quick-reply-opt" style="padding: 6px 12px; background: #2B2B2B; border: 1px solid #2B9EB3; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 0.85rem;">Thanks for your feedback!</button>
+          <button class="quick-reply-opt" style="padding: 6px 12px; background: #2B2B2B; border: 1px solid #2B9EB3; border-radius: 4px; color: #ccc; cursor: pointer; font-size: 0.85rem;">Stay tuned to WYXR 91.7FM!</button>
+        </div>
+      </div>
+      <textarea id="replyText" rows="4" placeholder="Type your reply..." style="width: 100%; padding: 10px; background: #2B2B2B; border: 2px solid #2B9EB3; border-radius: 6px; color: white; font-size: 0.95rem; resize: vertical;"></textarea>
+      <div id="replyError" style="color: #E9407A; font-size: 0.9rem; margin-top: 8px; display: none;"></div>
+      <div style="display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end;">
+        <button class="btn btn-primary" id="confirmReply">Send Reply</button>
+        <button class="btn btn-secondary" id="cancelReply">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentFilters = {};
     let currentPage = 0;
@@ -662,8 +725,12 @@ router.get('/messages', requireAuth, async (req, res) => {
             \${msg.is_blocked ? '<span class="badge badge-blocked">Blocked</span>' : ''}
           </td>
           <td>
-            \${!msg.is_blocked ? \`<button class="btn btn-warning block-btn" data-phone="\${msg.phone}">Block</button>\` : '<span class="badge badge-blocked">Blocked</span>'}
-            <button class="btn btn-danger delete-btn" data-id="\${msg.id}">Delete</button>
+            <div class="action-cell">
+              <button class="btn btn-read-toggle read-toggle-btn" data-id="\${msg.id}" data-read="\${msg.read}">\${msg.read ? 'Mark Unread' : 'Mark Read'}</button>
+              \${msg.opted_in ? \`<button class="btn btn-reply reply-btn" data-id="\${msg.id}" data-phone="\${msg.phone}" data-text="\${escapeHtml(msg.text)}">Reply</button>\` : ''}
+              \${!msg.is_blocked ? \`<button class="btn btn-warning block-btn" data-phone="\${msg.phone}">Block</button>\` : '<span class="badge badge-blocked">Blocked</span>'}
+              <button class="btn btn-danger delete-btn" data-id="\${msg.id}">Delete</button>
+            </div>
           </td>
         </tr>
       \`).join('');
@@ -882,6 +949,104 @@ router.get('/messages', requireAuth, async (req, res) => {
           console.error('Error unblocking number:', error);
           alert('Error unblocking number');
         }
+      }
+    });
+
+    // Mark Read / Unread
+    document.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('read-toggle-btn')) {
+        const id = e.target.dataset.id;
+        const currentRead = e.target.dataset.read === 'true';
+        try {
+          const response = await fetch(\`/api/messages/\${id}/read\`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ read: !currentRead }),
+            credentials: 'include'
+          });
+          if (response.ok) {
+            fetchMessages();
+          } else {
+            alert('Failed to update read status');
+          }
+        } catch (error) {
+          alert('Error updating read status');
+        }
+      }
+    });
+
+    // Reply button - open modal
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('reply-btn')) {
+        const id = e.target.dataset.id;
+        const phone = e.target.dataset.phone;
+        const text = e.target.dataset.text;
+        document.getElementById('replyPhoneDisplay').textContent = formatPhone(phone);
+        document.getElementById('replyOriginalText').textContent = text;
+        document.getElementById('replyText').value = '';
+        document.getElementById('replyError').style.display = 'none';
+        document.getElementById('replyModal').style.display = 'block';
+        document.getElementById('replyModal').dataset.id = id;
+        setTimeout(() => document.getElementById('replyText').focus(), 50);
+      }
+    });
+
+    // Quick reply buttons
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('quick-reply-opt')) {
+        document.getElementById('replyText').value = e.target.textContent;
+        document.getElementById('replyText').focus();
+      }
+    });
+
+    // Cancel reply
+    document.getElementById('cancelReply').addEventListener('click', () => {
+      document.getElementById('replyModal').style.display = 'none';
+    });
+
+    // Send reply
+    document.getElementById('confirmReply').addEventListener('click', async () => {
+      const id = document.getElementById('replyModal').dataset.id;
+      const replyText = document.getElementById('replyText').value.trim();
+      const errEl = document.getElementById('replyError');
+
+      if (!replyText) {
+        errEl.textContent = 'Please enter a reply message.';
+        errEl.style.display = 'block';
+        return;
+      }
+      errEl.style.display = 'none';
+      document.getElementById('confirmReply').textContent = 'Sending...';
+      document.getElementById('confirmReply').disabled = true;
+
+      try {
+        const response = await fetch(\`/api/messages/\${id}/reply\`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ replyText }),
+          credentials: 'include'
+        });
+        if (response.ok) {
+          document.getElementById('replyModal').style.display = 'none';
+          fetchMessages();
+        } else {
+          const data = await response.json();
+          errEl.textContent = data.error || 'Failed to send reply';
+          errEl.style.display = 'block';
+        }
+      } catch (error) {
+        errEl.textContent = 'Error sending reply';
+        errEl.style.display = 'block';
+      } finally {
+        document.getElementById('confirmReply').textContent = 'Send Reply';
+        document.getElementById('confirmReply').disabled = false;
+      }
+    });
+
+    // Close reply modal on overlay click
+    document.getElementById('replyModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('replyModal')) {
+        document.getElementById('replyModal').style.display = 'none';
       }
     });
 
