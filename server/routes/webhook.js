@@ -139,10 +139,10 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
         await logOptInAction(From, 'already_opted_in', 'sms', Body, twilioService.MESSAGES.ALREADY_OPTED_IN);
       }
 
-      // Broadcast to DJs
+      // Broadcast to DJs (include opted_in so Reply button appears immediately)
       const io = req.app.get('io');
       if (io) {
-        io.emit('message:new', message);
+        io.emit('message:new', { ...message, opted_in: true });
       }
       console.log('Message broadcast to DJs (opted-in contact)');
       res.type('text/xml');
