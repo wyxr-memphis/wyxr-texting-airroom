@@ -1,7 +1,63 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAuthAdmin } = require('../middleware/auth');
+
+// GET /admin/login - Login form for admin panel
+router.get('/login', (req, res) => {
+  if (req.session && req.session.authenticated) {
+    return res.redirect('/admin/messages');
+  }
+  const error = req.query.error ? '<p style="color:#E9407A;margin-bottom:16px;">Invalid username or password.</p>' : '';
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WYXR Admin Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #2B2B2B; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #3a3a3a; border-radius: 12px; padding: 40px; width: 100%; max-width: 360px; }
+    h1 { color: #FFC629; font-size: 24px; margin-bottom: 8px; }
+    p.sub { color: #aaa; font-size: 14px; margin-bottom: 28px; }
+    label { display: block; font-size: 13px; color: #ccc; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #2B2B2B; border: 1px solid #555; border-radius: 6px; color: #fff; font-size: 15px; margin-bottom: 16px; }
+    input:focus { outline: none; border-color: #2B9EB3; }
+    button { width: 100%; padding: 12px; background: #2B9EB3; border: none; border-radius: 6px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #24899c; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>WYXR Admin</h1>
+    <p class="sub">Sign in to access the admin panel</p>
+    ${error}
+    <form method="POST" action="/admin/login">
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <button type="submit">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>`);
+});
+
+// POST /admin/login - Authenticate and redirect
+router.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (
+    username === process.env.AUTH_USERNAME &&
+    password === process.env.AUTH_PASSWORD
+  ) {
+    req.session.authenticated = true;
+    req.session.username = username;
+    return res.redirect('/admin/messages');
+  }
+  return res.redirect('/admin/login?error=1');
+});
 
 // GET /admin/messages/search - Search and filter messages (API endpoint)
 router.get('/messages/search', requireAuth, async (req, res) => {
@@ -99,7 +155,7 @@ router.get('/messages/search', requireAuth, async (req, res) => {
 });
 
 // GET /admin/messages - View all messages (admin interface)
-router.get('/messages', requireAuth, async (req, res) => {
+router.get('/messages', requireAuthAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT m.id, m.phone, m.text, m.timestamp, m.read, m.replied, m.reply_text, m.replied_at, m.created_at,
@@ -1224,7 +1280,7 @@ function formatDate(timestamp) {
 }
 
 // GET /admin/contacts - View all contacts and opt-in status
-router.get('/contacts', requireAuth, async (req, res) => {
+router.get('/contacts', requireAuthAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
