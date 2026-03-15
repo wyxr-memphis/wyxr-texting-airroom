@@ -12,7 +12,7 @@ Real-time text messaging application for WYXR 91.7 FM radio station. Listeners t
 
 **Deployment:** Frontend on Vercel + Backend on Render.com + PostgreSQL database on Render
 **Production URL:** https://wyxr-texting-airroom.vercel.app
-**Important:** Desktop/laptop only - mobile browsers have session cookie issues
+**Admin Panel:** Accessible on mobile at `https://wyxr-texting-airroom.onrender.com/admin/login` — unauthenticated requests redirect to a login form instead of a JSON error
 
 ## Common Commands
 
@@ -191,7 +191,7 @@ Reply modal and backend endpoints exist but SMS sending is blocked until Twilio 
 
 ### Admin Panel
 
-`/admin/messages` is a server-rendered HTML page (not React) for staff to view all messages and delete inappropriate ones. Uses same session authentication.
+`/admin/messages` and `/admin/contacts` are server-rendered HTML pages (not React) for staff. Unauthenticated requests redirect to `/admin/login` (a styled login form). Works on mobile browsers. Uses same `AUTH_USERNAME`/`AUTH_PASSWORD` credentials.
 
 ### Twilio Webhook Format
 
