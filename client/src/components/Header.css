@@ -147,12 +147,13 @@
   font-weight: 600;
   font-size: 14px;
   transition: all 0.2s;
-  background-color: #444;
-  color: #ffffff;
+  background-color: transparent;
+  color: #E9407A;
+  border: 2px solid #E9407A;
 }
 
 .pledge-toggle:hover {
-  background-color: #555;
+  background-color: rgba(233, 64, 122, 0.15);
 }
 
 .pledge-toggle.active {
