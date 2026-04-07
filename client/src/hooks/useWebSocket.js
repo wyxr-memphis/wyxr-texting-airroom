@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsUpdated) => {
+const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect) => {
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -24,8 +24,15 @@ const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsU
 
     socketRef.current = socket;
 
+    let hasConnectedBefore = false;
+
     socket.on('connect', () => {
       console.log('WebSocket connected');
+      if (hasConnectedBefore && onReconnect) {
+        console.log('WebSocket reconnected, refetching messages...');
+        onReconnect();
+      }
+      hasConnectedBefore = true;
     });
 
     socket.on('disconnect', () => {
@@ -54,7 +61,7 @@ const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsU
     return () => {
       socket.disconnect();
     };
-  }, [authenticated, onMessageNew, onMessageUpdated, onSettingsUpdated]);
+  }, [authenticated, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect]);
 
   return socketRef.current;
 };

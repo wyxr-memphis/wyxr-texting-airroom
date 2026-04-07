@@ -40,7 +40,7 @@ const Header = ({ unreadCount, messagingEnabled, onToggleMessaging, onLogout }) 
 
           <div className="header-right-info">
             <div className="message-info">
-              📅 Messages shown for last 12 hours • All messages stored permanently
+              📅 Messages shown for last 2 hours • All messages stored permanently
             </div>
             {unreadCount > 0 && (
               <div className="unread-badge">

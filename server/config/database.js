@@ -7,7 +7,8 @@ const pool = new Pool({
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  // Pool automatically removes errored clients and creates new ones
+  // Do not crash the server on transient DB connection issues
 });
 
 module.exports = pool;

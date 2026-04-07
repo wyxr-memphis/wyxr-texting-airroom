@@ -93,11 +93,11 @@ Uses `express-session` with PostgreSQL store (not in-memory):
 - `app.set('trust proxy', 1)` for Render/Cloudflare
 - Single username/password from environment variables (`AUTH_USERNAME`, `AUTH_PASSWORD`)
 
-### 12-Hour Display Window
+### 2-Hour Display Window
 
-**Important:** Messages are stored permanently but only displayed if within 12 hours:
+**Important:** Messages are stored permanently but only displayed if within 2 hours:
 ```sql
-WHERE timestamp >= NOW() - INTERVAL '12 hours'
+WHERE timestamp >= NOW() - INTERVAL '2 hours'
 ```
 This is enforced in `server/routes/messages.js` GET endpoint. All messages remain in database for staff review via admin panel.
 
