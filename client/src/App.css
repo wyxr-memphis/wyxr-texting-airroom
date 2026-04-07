@@ -3,6 +3,10 @@
   background-color: #2B2B2B;
 }
 
+.app.pledge-drive {
+  background-color: #f5f0e8;
+}
+
 .app-loading {
   display: flex;
   justify-content: center;

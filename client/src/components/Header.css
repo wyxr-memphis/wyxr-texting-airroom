@@ -137,6 +137,71 @@
   background-color: #555;
 }
 
+/* Pledge Drive Toggle Button */
+.pledge-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  background-color: transparent;
+  color: #E9407A;
+  border: 2px solid #E9407A;
+}
+
+.pledge-toggle:hover {
+  background-color: rgba(233, 64, 122, 0.15);
+}
+
+.pledge-toggle.active {
+  background-color: #E9407A;
+  color: #ffffff;
+}
+
+.pledge-toggle.active:hover {
+  background-color: #d4366d;
+}
+
+/* Pledge Drive Mode — Header Overrides */
+.app.pledge-drive .header {
+  background-color: #ffffff;
+  border-bottom-color: #2B9EB3;
+}
+
+.app.pledge-drive .header-logo {
+  color: #2B9EB3;
+}
+
+.app.pledge-drive .on-air-box.pledge-drive-box {
+  background-color: #d4f0f5;
+  border-color: #2B9EB3;
+  color: #2B2B2B;
+}
+
+.app.pledge-drive .on-air-box.pledge-drive-box p strong {
+  color: #c0365e;
+}
+
+.app.pledge-drive .message-info {
+  color: #555;
+}
+
+.app.pledge-drive .unread-badge {
+  background-color: #2B9EB3;
+}
+
+.app.pledge-drive .logout-button {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.app.pledge-drive .logout-button:hover {
+  background-color: #d0d0d0;
+}
+
 @media (max-width: 1200px) {
   .header-content {
     flex-direction: column;

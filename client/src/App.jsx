@@ -13,6 +13,17 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [messagingEnabled, setMessagingEnabled] = useState(true);
   const [replyModalMessage, setReplyModalMessage] = useState(null);
+  const [pledgeDriveMode, setPledgeDriveMode] = useState(
+    () => localStorage.getItem('wyxr-pledge-drive') === 'true'
+  );
+
+  const handleTogglePledgeDrive = () => {
+    setPledgeDriveMode(prev => {
+      const next = !prev;
+      localStorage.setItem('wyxr-pledge-drive', String(next));
+      return next;
+    });
+  };
 
   // WebSocket handlers
   const handleMessageNew = useCallback((message) => {
@@ -127,12 +138,13 @@ function App() {
 
   // Update document title with unread count
   useEffect(() => {
+    const baseTitle = pledgeDriveMode ? 'WYXR Staff Communicator' : 'WYXR Text App';
     if (unreadCount > 0) {
-      document.title = `(${unreadCount}) WYXR Text App`;
+      document.title = `(${unreadCount}) ${baseTitle}`;
     } else {
-      document.title = 'WYXR Text App';
+      document.title = baseTitle;
     }
-  }, [unreadCount]);
+  }, [unreadCount, pledgeDriveMode]);
 
   if (loading) {
     return (
@@ -147,12 +159,14 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app${pledgeDriveMode ? ' pledge-drive' : ''}`}>
       <Header
         unreadCount={unreadCount}
         messagingEnabled={messagingEnabled}
         onToggleMessaging={handleToggleMessaging}
         onLogout={handleLogout}
+        pledgeDriveMode={pledgeDriveMode}
+        onTogglePledgeDrive={handleTogglePledgeDrive}
       />
 
       <MessageFeed

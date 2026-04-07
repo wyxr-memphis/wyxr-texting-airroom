@@ -44,6 +44,17 @@
   }
 }
 
+/* Pledge Drive Mode — Feed Overrides */
+.app.pledge-drive .disabled-message h2,
+.app.pledge-drive .empty-message h2 {
+  color: #2B9EB3;
+}
+
+.app.pledge-drive .disabled-message p,
+.app.pledge-drive .empty-message p {
+  color: #555;
+}
+
 @media (max-width: 900px) {
   .message-grid {
     grid-template-columns: 1fr;
