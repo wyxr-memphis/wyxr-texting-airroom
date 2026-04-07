@@ -29,8 +29,18 @@ function App() {
     setMessagingEnabled(settings.messagingEnabled);
   }, []);
 
-  // Initialize WebSocket
-  useWebSocket(authenticated, handleMessageNew, handleMessageUpdated, handleSettingsUpdated);
+  // Fetch messages from API (used on load and on WebSocket reconnect)
+  const fetchMessages = useCallback(async () => {
+    try {
+      const messagesData = await api.getMessages();
+      setMessages(messagesData);
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    }
+  }, []);
+
+  // Initialize WebSocket (refetch messages on reconnect so DJs don't need to refresh)
+  useWebSocket(authenticated, handleMessageNew, handleMessageUpdated, handleSettingsUpdated, fetchMessages);
 
   // Check authentication on mount
   useEffect(() => {

@@ -86,6 +86,26 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Global error handlers to prevent silent crashes
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason);
+});
+
+// Graceful shutdown (Render sends SIGTERM before killing)
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    pool.end(() => {
+      console.log('Server and database pool closed');
+      process.exit(0);
+    });
+  });
+});
+
 // Start server
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
