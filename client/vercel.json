@@ -4,6 +4,14 @@
   "devCommand": "npm start",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://wyxr-texting-airroom.onrender.com/api/:path*"
+    },
+    {
+      "source": "/webhook/:path*",
+      "destination": "https://wyxr-texting-airroom.onrender.com/webhook/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

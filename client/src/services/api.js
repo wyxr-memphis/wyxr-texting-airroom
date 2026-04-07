@@ -1,4 +1,6 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// In production, API calls go through Vercel proxy (same-origin) to avoid third-party cookie blocking
+// In development, API calls go directly to the backend server
+const API_URL = process.env.NODE_ENV === 'production' ? '' : (process.env.REACT_APP_API_URL || 'http://localhost:3001');
 
 const apiCall = async (endpoint, options = {}) => {
   const response = await fetch(`${API_URL}${endpoint}`, {
