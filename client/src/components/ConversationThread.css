@@ -236,3 +236,60 @@
   background-color: #247a8a;
   border-color: #247a8a;
 }
+
+/* Pledge Drive Mode — Thread Overrides */
+.app.pledge-drive .conversation-thread.has-unread {
+  background-color: #e8f7fa;
+  border-color: #2B9EB3;
+  color: #2B2B2B;
+}
+
+.app.pledge-drive .conversation-thread.all-read {
+  background-color: #ffffff;
+  border-color: #ddd;
+  color: #333;
+}
+
+.app.pledge-drive .conversation-thread.has-unread .thread-phone {
+  color: #2B9EB3;
+}
+
+.app.pledge-drive .conversation-thread.all-read .thread-phone {
+  color: #2B9EB3;
+}
+
+.app.pledge-drive .thread-unread-badge {
+  background-color: #2B9EB3;
+}
+
+.app.pledge-drive .thread-unread-dot {
+  background-color: #2B9EB3;
+}
+
+.app.pledge-drive .conversation-thread.has-unread .thread-message.unread .thread-message-text {
+  color: #2B2B2B;
+}
+
+.app.pledge-drive .conversation-thread.has-unread .thread-message.read .thread-message-text {
+  color: rgba(43, 43, 43, 0.6);
+}
+
+.app.pledge-drive .conversation-thread.all-read .thread-message-text {
+  color: #333;
+}
+
+.app.pledge-drive .conversation-thread.has-unread .thread-message {
+  border-bottom-color: rgba(43, 158, 179, 0.2);
+}
+
+.app.pledge-drive .conversation-thread.all-read .thread-message {
+  border-bottom-color: #e0e0e0;
+}
+
+.app.pledge-drive .conversation-thread.has-unread .thread-actions {
+  border-top-color: rgba(43, 158, 179, 0.2);
+}
+
+.app.pledge-drive .conversation-thread.all-read .thread-actions {
+  border-top-color: #e0e0e0;
+}
