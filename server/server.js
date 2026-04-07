@@ -112,4 +112,21 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Keep-alive: ping own public URL to prevent Render free-tier spin-down
+  if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
+    const PING_INTERVAL = 10 * 60 * 1000; // 10 minutes
+    const healthUrl = `${process.env.RENDER_EXTERNAL_URL}/health`;
+
+    setInterval(async () => {
+      try {
+        const res = await fetch(healthUrl);
+        console.log(`[keep-alive] Pinged ${healthUrl} — status ${res.status}`);
+      } catch (err) {
+        console.error(`[keep-alive] Ping failed:`, err.message);
+      }
+    }, PING_INTERVAL);
+
+    console.log(`[keep-alive] Will ping ${healthUrl} every ${PING_INTERVAL / 60000} min`);
+  }
 });
