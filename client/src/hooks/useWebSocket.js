@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect) => {
+const useWebSocket = (authenticated, wsToken, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect) => {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    if (!authenticated) {
+    if (!authenticated || !wsToken) {
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
@@ -13,18 +13,19 @@ const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsU
       return;
     }
 
-    // In production, use relative URL so the socket goes through Vercel's
-    // /socket.io/* rewrite to Render (carries the session cookie correctly).
-    // In dev, connect directly to the local backend.
+    // Connect directly to Render in production (bypasses Vercel, which can't
+    // reliably proxy WebSocket auth with a cookie on the Vercel domain).
+    // In dev, use REACT_APP_API_URL (defaults to localhost:3001).
     const WS_URL = process.env.NODE_ENV === 'production'
-      ? ''
+      ? 'https://wyxr-texting-airroom.onrender.com'
       : (process.env.REACT_APP_API_URL || 'http://localhost:3001');
 
     const socket = io(WS_URL, {
+      auth: { token: wsToken },
       withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: Infinity
+      reconnectionAttempts: Infinity,
     });
 
     socketRef.current = socket;
@@ -66,7 +67,7 @@ const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsU
     return () => {
       socket.disconnect();
     };
-  }, [authenticated, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect]);
+  }, [authenticated, wsToken, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect]);
 
   return socketRef.current;
 };

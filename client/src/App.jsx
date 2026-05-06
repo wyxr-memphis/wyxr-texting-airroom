@@ -13,6 +13,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [messagingEnabled, setMessagingEnabled] = useState(true);
   const [replyModalMessage, setReplyModalMessage] = useState(null);
+  const [wsToken, setWsToken] = useState(null);
   const [pledgeDriveMode, setPledgeDriveMode] = useState(
     () => localStorage.getItem('wyxr-pledge-drive') === 'true'
   );
@@ -50,8 +51,8 @@ function App() {
     }
   }, []);
 
-  // Initialize WebSocket (refetch messages on reconnect so DJs don't need to refresh)
-  useWebSocket(authenticated, handleMessageNew, handleMessageUpdated, handleSettingsUpdated, fetchMessages);
+  // Initialize WebSocket — only once wsToken is available (prevents auth failures)
+  useWebSocket(authenticated, wsToken, handleMessageNew, handleMessageUpdated, handleSettingsUpdated, fetchMessages);
 
   // Check authentication on mount
   useEffect(() => {
@@ -59,6 +60,7 @@ function App() {
       try {
         const result = await api.verify();
         setAuthenticated(result.authenticated);
+        if (result.wsToken) setWsToken(result.wsToken);
       } catch (error) {
         console.error('Auth check failed:', error);
         setAuthenticated(false);
@@ -92,7 +94,8 @@ function App() {
   }, [authenticated]);
 
   const handleLogin = async (username, password) => {
-    await api.login(username, password);
+    const result = await api.login(username, password);
+    if (result.wsToken) setWsToken(result.wsToken);
     setAuthenticated(true);
   };
 
@@ -103,6 +106,7 @@ function App() {
       console.error('Logout failed:', error);
     } finally {
       setAuthenticated(false);
+      setWsToken(null);
       setMessages([]);
     }
   };
