@@ -115,9 +115,13 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
       await twilioService.sendOptInRequest(From);
       await logOptInAction(From, 'request', 'sms', Body, twilioService.MESSAGES.OPT_IN_REQUEST);
 
-      console.log('New contact - opt-in request sent (pending A2P):', From);
+      // Broadcast to DJs so they can see the message (Reply is gated on opt-in status)
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('message:new', { ...message, opted_in: false });
+      }
 
-      // Don't broadcast to DJs yet - waiting for opt-in
+      console.log('New contact - opt-in request sent, message broadcast to DJs:', From);
       res.type('text/xml');
       res.send('<Response></Response>');
       return;
@@ -210,7 +214,13 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
       await twilioService.sendOptInReminder(From);
       await logOptInAction(From, 'reminder', 'sms', Body, twilioService.MESSAGES.OPT_IN_REMINDER);
 
-      console.log('Pending contact - reminder sent:', From);
+      // Broadcast to DJs (Reply remains gated on opt-in status)
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('message:new', { ...message, opted_in: false });
+      }
+
+      console.log('Pending contact - reminder sent, message broadcast to DJs:', From);
       res.type('text/xml');
       res.send('<Response></Response>');
       return;

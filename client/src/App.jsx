@@ -109,8 +109,8 @@ function App() {
 
   const handleMarkRead = async (id, read) => {
     try {
-      await api.updateMessageReadStatus(id, read);
-      // Update will come through WebSocket
+      const updatedMessage = await api.updateMessageReadStatus(id, read);
+      handleMessageUpdated(updatedMessage);
     } catch (error) {
       console.error('Failed to update message:', error);
     }

@@ -19,7 +19,7 @@ const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsU
       withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 10
+      reconnectionAttempts: Infinity
     });
 
     socketRef.current = socket;
