@@ -12,6 +12,10 @@
       "destination": "https://wyxr-texting-airroom.onrender.com/webhook/:path*"
     },
     {
+      "source": "/socket.io/:path*",
+      "destination": "https://wyxr-texting-airroom.onrender.com/socket.io/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

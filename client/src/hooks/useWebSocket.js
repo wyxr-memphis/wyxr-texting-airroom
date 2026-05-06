@@ -13,9 +13,14 @@ const useWebSocket = (authenticated, onMessageNew, onMessageUpdated, onSettingsU
       return;
     }
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    // In production, use relative URL so the socket goes through Vercel's
+    // /socket.io/* rewrite to Render (carries the session cookie correctly).
+    // In dev, connect directly to the local backend.
+    const WS_URL = process.env.NODE_ENV === 'production'
+      ? ''
+      : (process.env.REACT_APP_API_URL || 'http://localhost:3001');
 
-    const socket = io(API_URL, {
+    const socket = io(WS_URL, {
       withCredentials: true,
       reconnection: true,
       reconnectionDelay: 1000,
