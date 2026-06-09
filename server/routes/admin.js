@@ -1944,7 +1944,7 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
           const nameDisplay = contact.first_name
             ? `<span class="contact-name-display">${escapeHtml(contact.first_name)}</span>`
             : '<span style="color:#555">—</span>';
-          const nameCell = `<td>${nameDisplay} <button class="edit-name-btn" data-phone="${escapeHtml(contact.phone_number)}" title="Edit name">✎</button></td>`;
+          const nameCell = `<td>${nameDisplay} <button class="edit-name-btn" data-phone="${escapeHtml(contact.phone_number)}" title="Edit name" onclick="editContactName(this)">✎</button></td>`;
           const sourceCell = `<td><span class="timestamp">${escapeHtml(contact.source || '—')}</span></td>`;
 
           return `
@@ -1993,43 +1993,39 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
     window.__importing = false;
     setTimeout(function() { if (!window.__editing && !window.__importing) location.reload(); }, 30000);
 
-    // Inline name edit
-    document.addEventListener('click', function(e) {
-      if (e.target.classList.contains('edit-name-btn')) {
-        var phone = e.target.dataset.phone;
-        var td = e.target.parentElement;
-        var current = td.querySelector('.contact-name-display');
-        var currentName = current ? current.textContent : '';
-        window.__editing = true;
-        td.innerHTML =
-          '<input type="text" class="name-edit-input" value="' + currentName.replace(/"/g, '&quot;') + '" maxlength="50"> ' +
-          '<button class="btn-save-name" data-phone="' + phone.replace(/"/g, '&quot;') + '">Save</button> ' +
-          '<button class="btn-cancel-name">Cancel</button>';
-        td.querySelector('.name-edit-input').focus();
-      }
-      if (e.target.classList.contains('btn-cancel-name')) {
-        window.__editing = false;
-        location.reload();
-      }
-    });
+    // Inline name edit — direct onclick functions (more reliable than event delegation)
+    function editContactName(btn) {
+      var phone = btn.dataset.phone;
+      var td = btn.parentElement;
+      var current = td.querySelector('.contact-name-display');
+      var currentName = current ? current.textContent : '';
+      window.__editing = true;
+      td.innerHTML =
+        '<input type="text" class="name-edit-input" value="' + currentName.replace(/"/g, '&quot;') + '" maxlength="50"> ' +
+        '<button class="btn-save-name" data-phone="' + phone.replace(/"/g, '&quot;') + '" onclick="saveContactName(this)">Save</button> ' +
+        '<button class="btn-cancel-name" onclick="cancelNameEdit()">Cancel</button>';
+      td.querySelector('.name-edit-input').focus();
+    }
 
-    document.addEventListener('click', async function(e) {
-      if (e.target.classList.contains('btn-save-name')) {
-        var phone = e.target.dataset.phone;
-        var td = e.target.parentElement;
-        var name = td.querySelector('.name-edit-input').value;
-        try {
-          var resp = await fetch('/admin/contacts/' + encodeURIComponent(phone), {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ first_name: name }),
-            credentials: 'include'
-          });
-          if (resp.ok) { window.__editing = false; location.reload(); }
-          else { alert('Failed to save name'); }
-        } catch (err) { alert('Error saving name'); }
-      }
-    });
+    function saveContactName(btn) {
+      var phone = btn.dataset.phone;
+      var td = btn.parentElement;
+      var name = td.querySelector('.name-edit-input').value;
+      fetch('/admin/contacts/' + encodeURIComponent(phone), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ first_name: name }),
+        credentials: 'include'
+      }).then(function(resp) {
+        if (resp.ok) { window.__editing = false; location.reload(); }
+        else { alert('Failed to save name'); }
+      }).catch(function() { alert('Error saving name'); });
+    }
+
+    function cancelNameEdit() {
+      window.__editing = false;
+      location.reload();
+    }
 
     // Add single contact
     document.getElementById('addContactBtn').addEventListener('click', async function() {
