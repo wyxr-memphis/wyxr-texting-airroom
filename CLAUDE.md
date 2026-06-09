@@ -247,3 +247,23 @@ Render free tier spins down after 15min idle. First request takes 50+ seconds. F
 - `ARCHITECTURE.md` - Detailed system architecture with diagrams
 - `DEPLOYMENT_STATUS.md` - Current deployment status and checklist
 - `FEATURE_REQUESTS.md` - Future enhancements (A2P reply, voice messages)
+
+## Deployment
+
+- After making changes, always commit, push, and deploy without waiting to be asked. Confirm the deployment is live by checking the production URL.
+
+## Debugging
+
+- When debugging image or asset display issues, always check: 
+  1) URL encoding (spaces, special chars)
+  2) CDN/Vercel caching of 404s
+  3) aspect ratio constraints. 
+Never assume a fix worked without verifying the live URL.
+
+## External APIs
+
+- When working with external APIs (Qgiv, Mailchimp, Twilio, etc.), always verify the exact request format (form-encoded vs JSON), correct base URLs/subdomains, and required credentials before making the first call.
+
+## Session Start
+
+- When resuming work from a previous session, read recent git log and open TODO/backlog files to understand what's unfinished before asking the user.
