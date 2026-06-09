@@ -1279,12 +1279,149 @@ function formatDate(timestamp) {
   });
 }
 
+// POST /admin/contacts/import - Bulk import contacts from CSV
+router.post('/contacts/import', requireAuth, async (req, res) => {
+  const { contacts: rows, consented, source } = req.body;
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'contacts array required' });
+  }
+  if (rows.length > 200) {
+    return res.status(400).json({ error: 'Maximum 200 rows per request' });
+  }
+
+  const { normalizePhone } = require('../utils/phone');
+  const twilioService = require('../services/twilio');
+  const sourceLabel = source ? source.trim().slice(0, 100) : null;
+
+  let imported = 0, updated = 0, skipped_existing = 0, skipped_pending = 0, skipped_opted_out = 0, optInRequestsQueued = 0;
+  const invalid = [];
+  const pendingSMSQueue = [];
+
+  for (const row of rows) {
+    const phone = normalizePhone(row.phone);
+    if (!phone) {
+      invalid.push({ raw: row.phone, reason: 'Invalid phone number format' });
+      continue;
+    }
+    const firstName = row.name ? row.name.trim().slice(0, 50) || null : null;
+
+    const existing = await pool.query('SELECT * FROM contacts WHERE phone_number = $1', [phone]);
+
+    if (existing.rows.length === 0) {
+      if (consented) {
+        await pool.query(
+          `INSERT INTO contacts (phone_number, first_name, opted_in, opt_in_method, opt_in_timestamp, source)
+           VALUES ($1, $2, true, 'import', NOW(), $3)`,
+          [phone, firstName, sourceLabel]
+        );
+        await pool.query(
+          `INSERT INTO opt_in_log (phone_number, action_type, method, consent_text, ip_address)
+           VALUES ($1, 'import_consent', 'import', $2, $3)`,
+          [phone, 'Admin attested prior consent via CSV import (source: ' + (sourceLabel || 'unspecified') + ')', req.ip]
+        );
+        imported++;
+      } else {
+        await pool.query(
+          `INSERT INTO contacts (phone_number, first_name, opted_in, opt_in_method, source)
+           VALUES ($1, $2, false, 'import', $3)`,
+          [phone, firstName, sourceLabel]
+        );
+        await pool.query(
+          `INSERT INTO opt_in_log (phone_number, action_type, method, ip_address)
+           VALUES ($1, 'import_opt_in_request', 'import', $2)`,
+          [phone, req.ip]
+        );
+        pendingSMSQueue.push(phone);
+        optInRequestsQueued++;
+        imported++;
+      }
+    } else {
+      const contact = existing.rows[0];
+
+      // Exists, opted_out — always skip (TCPA)
+      if (contact.opted_out) {
+        skipped_opted_out++;
+        continue;
+      }
+
+      if (contact.opted_in) {
+        if (!contact.first_name && firstName) {
+          await pool.query('UPDATE contacts SET first_name = $1 WHERE phone_number = $2', [firstName, phone]);
+          updated++;
+        } else {
+          skipped_existing++;
+        }
+        continue;
+      }
+
+      // Exists, pending
+      if (consented) {
+        await pool.query(
+          `UPDATE contacts SET opted_in = true, opt_in_method = 'import', opt_in_timestamp = NOW(),
+           first_name = COALESCE(NULLIF(TRIM(COALESCE(first_name, '')), ''), $1),
+           source = COALESCE(source, $2)
+           WHERE phone_number = $3`,
+          [firstName, sourceLabel, phone]
+        );
+        await pool.query(
+          `INSERT INTO opt_in_log (phone_number, action_type, method, consent_text, ip_address)
+           VALUES ($1, 'import_consent', 'import', $2, $3)`,
+          [phone, 'Admin attested prior consent via CSV import (source: ' + (sourceLabel || 'unspecified') + ')', req.ip]
+        );
+        updated++;
+      } else {
+        if (!contact.first_name && firstName) {
+          await pool.query('UPDATE contacts SET first_name = $1 WHERE phone_number = $2', [firstName, phone]);
+        }
+        skipped_pending++;
+      }
+    }
+  }
+
+  if (pendingSMSQueue.length > 0) {
+    setImmediate(async () => {
+      for (const phone of pendingSMSQueue) {
+        await twilioService.sendOptInRequest(phone);
+        await new Promise(resolve => setTimeout(resolve, 1100));
+      }
+    });
+  }
+
+  res.json({ imported, updated, skipped_existing, skipped_pending, skipped_opted_out, invalid, optInRequestsQueued });
+});
+
+// PATCH /admin/contacts/:phone - Update contact first name
+router.patch('/contacts/:phone', requireAuth, async (req, res) => {
+  try {
+    const phone = decodeURIComponent(req.params.phone);
+    const { first_name } = req.body;
+    const name = first_name !== undefined ? (first_name.trim().slice(0, 50) || null) : null;
+
+    const result = await pool.query(
+      'UPDATE contacts SET first_name = $1 WHERE phone_number = $2 RETURNING *',
+      [name, phone]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating contact name:', error);
+    res.status(500).json({ error: 'Failed to update contact' });
+  }
+});
+
 // GET /admin/contacts - View all contacts and opt-in status
 router.get('/contacts', requireAuthAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
         c.phone_number,
+        c.first_name,
+        c.source,
         c.opted_in,
         c.opt_in_method,
         c.opt_in_timestamp,
@@ -1548,6 +1685,139 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
       color: white;
     }
 
+    .import-section {
+      background: #1a1a1a;
+      border-radius: 8px;
+      border: 2px solid #2B9EB3;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .import-section h2 {
+      color: #FFC629;
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .form-group label {
+      color: #aaa;
+      font-size: 0.85rem;
+    }
+
+    .form-input {
+      padding: 8px 12px;
+      background: #2B2B2B;
+      border: 1.5px solid #555;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .form-input:focus { outline: none; border-color: #2B9EB3; }
+
+    .btn-import {
+      padding: 8px 20px;
+      background: #2B9EB3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-import:hover { background: #247a8a; }
+
+    .btn-add {
+      padding: 8px 20px;
+      background: #4ade80;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-add:hover { background: #22c55e; }
+
+    .consent-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .consent-row label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: #ccc;
+      font-size: 0.9rem;
+    }
+
+    #importResults {
+      margin-top: 12px;
+      padding: 12px;
+      background: #2B2B2B;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    .section-divider {
+      border: none;
+      border-top: 1px solid #333;
+      margin: 20px 0;
+    }
+
+    .edit-name-btn {
+      background: none;
+      border: none;
+      color: #2B9EB3;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 2px 6px;
+      border-radius: 3px;
+      opacity: 0.6;
+    }
+
+    .edit-name-btn:hover { opacity: 1; background: #2B2B2B; }
+
+    .name-edit-input {
+      padding: 4px 8px;
+      background: #2B2B2B;
+      border: 1.5px solid #2B9EB3;
+      border-radius: 4px;
+      color: white;
+      font-size: 0.85rem;
+      width: 120px;
+    }
+
+    .btn-save-name { padding: 3px 8px; background: #4ade80; color: #1a1a1a; border: none; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+    .btn-cancel-name { padding: 3px 8px; background: #555; color: white; border: none; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+
     @media (max-width: 1200px) {
       .contacts-table {
         overflow-x: auto;
@@ -1567,6 +1837,51 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
       <a href="/admin/messages" class="nav-link">Messages</a>
       <a href="/admin/contacts" class="nav-link active">Contacts</a>
     </div>
+  </div>
+
+  <!-- Add Contact & CSV Import -->
+  <div class="import-section">
+    <h2>Add Contact</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Name (optional)</label>
+        <input type="text" id="addName" class="form-input" placeholder="First name" maxlength="50">
+      </div>
+      <div class="form-group">
+        <label>Phone *</label>
+        <input type="text" id="addPhone" class="form-input" placeholder="901-555-1234">
+      </div>
+      <div class="form-group">
+        <label>Source</label>
+        <input type="text" id="addSource" class="form-input" placeholder="e.g. Walk-in" maxlength="100">
+      </div>
+    </div>
+    <div class="consent-row">
+      <label><input type="radio" name="addConsent" value="consented" checked> Already consented</label>
+      <label><input type="radio" name="addConsent" value="request"> Send opt-in request SMS</label>
+      <button class="btn-add" id="addContactBtn">Add Contact</button>
+    </div>
+    <div id="addResult" style="margin-top:10px;font-size:0.85rem;display:none;"></div>
+
+    <hr class="section-divider">
+
+    <h2>CSV Import</h2>
+    <p style="color:#888;font-size:0.85rem;margin-bottom:12px;">CSV columns: <code style="background:#2B2B2B;padding:1px 4px;border-radius:3px;">phone</code> and <code style="background:#2B2B2B;padding:1px 4px;border-radius:3px;">name</code> (optional). First row is header.</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>CSV File</label>
+        <input type="file" id="csvFile" accept=".csv" class="form-input">
+      </div>
+      <div class="form-group">
+        <label>Source label (applied to every contact in batch)</label>
+        <input type="text" id="csvSource" class="form-input" placeholder="e.g. Mailchimp June 2026" maxlength="100">
+      </div>
+    </div>
+    <div class="consent-row">
+      <label><input type="checkbox" id="csvConsented"> These contacts already consented (do not send opt-in SMS)</label>
+      <button class="btn-import" id="importBtn">Import CSV</button>
+    </div>
+    <div id="importResults"></div>
   </div>
 
   <div class="stats">
@@ -1593,8 +1908,10 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
       <thead>
         <tr>
           <th>Phone Number</th>
+          <th>Name</th>
           <th>Status</th>
           <th>Method</th>
+          <th>Source</th>
           <th>Opt-In Date</th>
           <th>Pending Message</th>
           <th>Last Contact</th>
@@ -1624,11 +1941,19 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
             ? `<button class="btn-unblock-contact contact-unblock-btn" data-phone="${contact.phone_number}">Unblock</button>`
             : `<button class="btn-block-contact contact-block-btn" data-phone="${contact.phone_number}">Block</button>`;
 
+          const nameDisplay = contact.first_name
+            ? `<span class="contact-name-display">${escapeHtml(contact.first_name)}</span>`
+            : '<span style="color:#555">—</span>';
+          const nameCell = `<td>${nameDisplay} <button class="edit-name-btn" data-phone="${escapeHtml(contact.phone_number)}" title="Edit name">✎</button></td>`;
+          const sourceCell = `<td><span class="timestamp">${escapeHtml(contact.source || '—')}</span></td>`;
+
           return `
             <tr>
               <td><strong>${formatPhone(contact.phone_number)}</strong></td>
+              ${nameCell}
               <td>${statusBadge}</td>
               <td>${methodBadge || '<span class="timestamp">—</span>'}</td>
+              ${sourceCell}
               <td><span class="timestamp">${formatTimestamp(contact.opt_in_timestamp)}</span></td>
               <td>${pendingMsg}</td>
               <td><span class="timestamp">${formatTimestamp(contact.last_message_timestamp)}</span></td>
@@ -1663,8 +1988,191 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
   </div>
 
   <script>
-    // Auto-refresh every 30 seconds
-    setTimeout(() => { location.reload(); }, 30000);
+    // Auto-refresh every 30 seconds (skip while editing or importing)
+    window.__editing = false;
+    window.__importing = false;
+    setTimeout(function() { if (!window.__editing && !window.__importing) location.reload(); }, 30000);
+
+    // Inline name edit
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('edit-name-btn')) {
+        var phone = e.target.dataset.phone;
+        var td = e.target.parentElement;
+        var current = td.querySelector('.contact-name-display');
+        var currentName = current ? current.textContent : '';
+        window.__editing = true;
+        td.innerHTML =
+          '<input type="text" class="name-edit-input" value="' + currentName.replace(/"/g, '&quot;') + '" maxlength="50"> ' +
+          '<button class="btn-save-name" data-phone="' + phone.replace(/"/g, '&quot;') + '">Save</button> ' +
+          '<button class="btn-cancel-name">Cancel</button>';
+        td.querySelector('.name-edit-input').focus();
+      }
+      if (e.target.classList.contains('btn-cancel-name')) {
+        window.__editing = false;
+        location.reload();
+      }
+    });
+
+    document.addEventListener('click', async function(e) {
+      if (e.target.classList.contains('btn-save-name')) {
+        var phone = e.target.dataset.phone;
+        var td = e.target.parentElement;
+        var name = td.querySelector('.name-edit-input').value;
+        try {
+          var resp = await fetch('/admin/contacts/' + encodeURIComponent(phone), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ first_name: name }),
+            credentials: 'include'
+          });
+          if (resp.ok) { window.__editing = false; location.reload(); }
+          else { alert('Failed to save name'); }
+        } catch (err) { alert('Error saving name'); }
+      }
+    });
+
+    // Add single contact
+    document.getElementById('addContactBtn').addEventListener('click', async function() {
+      var name = document.getElementById('addName').value.trim();
+      var phone = document.getElementById('addPhone').value.trim();
+      var source = document.getElementById('addSource').value.trim();
+      var consented = document.querySelector('input[name="addConsent"]:checked').value === 'consented';
+      var resultDiv = document.getElementById('addResult');
+      if (!phone) { alert('Phone number is required'); return; }
+      window.__importing = true;
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = 'Adding...';
+      try {
+        var resp = await fetch('/admin/contacts/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contacts: [{ name: name, phone: phone }], consented: consented, source: source }),
+          credentials: 'include'
+        });
+        var data = await resp.json();
+        if (!resp.ok) {
+          resultDiv.style.color = '#ef4444'; resultDiv.textContent = data.error || 'Error';
+        } else if (data.invalid && data.invalid.length > 0) {
+          resultDiv.style.color = '#ef4444'; resultDiv.textContent = 'Invalid phone: ' + data.invalid[0].reason;
+        } else {
+          resultDiv.style.color = '#4ade80';
+          resultDiv.textContent = data.imported ? 'Contact added!' : (data.updated ? 'Contact updated.' : 'Contact already exists (skipped).');
+          setTimeout(function() { location.reload(); }, 1000);
+        }
+      } catch (err) {
+        resultDiv.style.color = '#ef4444'; resultDiv.textContent = 'Error adding contact';
+      } finally { window.__importing = false; }
+    });
+
+    // CSV parsing
+    function parseCSVRow(line) {
+      var cols = [], cur = '', inQ = false;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (c === '"') {
+          if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (c === ',' && !inQ) { cols.push(cur); cur = ''; }
+        else { cur += c; }
+      }
+      cols.push(cur);
+      return cols;
+    }
+
+    function parseCSV(text) {
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+      if (lines.length < 2) return [];
+      var headers = parseCSVRow(lines[0]).map(function(h) { return h.trim().toLowerCase(); });
+      var phoneIdx = headers.indexOf('phone');
+      var nameIdx = headers.indexOf('name');
+      if (phoneIdx === -1) return null;
+      var rows = [], seen = {};
+      for (var i = 1; i < lines.length; i++) {
+        var cols = parseCSVRow(lines[i]);
+        var ph = (cols[phoneIdx] || '').trim();
+        if (!ph || seen[ph]) continue;
+        seen[ph] = true;
+        rows.push({ phone: ph, name: nameIdx >= 0 ? (cols[nameIdx] || '').trim() : '' });
+      }
+      return rows;
+    }
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    document.getElementById('importBtn').addEventListener('click', async function() {
+      var file = document.getElementById('csvFile').files[0];
+      if (!file) { alert('Select a CSV file first'); return; }
+      var source = document.getElementById('csvSource').value.trim();
+      var consented = document.getElementById('csvConsented').checked;
+      var resultsDiv = document.getElementById('importResults');
+      var text = await file.text();
+      var rows = parseCSV(text);
+      if (rows === null) {
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = '<span style="color:#ef4444">CSV must have a "phone" column header.</span>';
+        return;
+      }
+      if (rows.length === 0) {
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = '<span style="color:#FFC629">No valid rows found in CSV.</span>';
+        return;
+      }
+      if (!consented && rows.length > 500) {
+        if (!confirm('This will send opt-in request SMS to ' + rows.length + ' phone numbers. Continue?')) return;
+      }
+      window.__importing = true;
+      resultsDiv.style.display = 'block';
+      resultsDiv.innerHTML = '<span style="color:#aaa">Importing...</span>';
+      var totalImported = 0, totalUpdated = 0, totalSkippedExisting = 0, totalSkippedPending = 0, totalSkippedOptedOut = 0, totalOptIn = 0;
+      var allInvalid = [];
+      for (var i = 0; i < rows.length; i += 200) {
+        var batch = rows.slice(i, i + 200);
+        try {
+          var resp = await fetch('/admin/contacts/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contacts: batch, consented: consented, source: source }),
+            credentials: 'include'
+          });
+          var data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || 'Server error');
+          totalImported += data.imported || 0;
+          totalUpdated += data.updated || 0;
+          totalSkippedExisting += data.skipped_existing || 0;
+          totalSkippedPending += data.skipped_pending || 0;
+          totalSkippedOptedOut += data.skipped_opted_out || 0;
+          totalOptIn += data.optInRequestsQueued || 0;
+          allInvalid = allInvalid.concat(data.invalid || []);
+        } catch (err) {
+          resultsDiv.innerHTML = '<span style="color:#ef4444">Import error: ' + escHtml(err.message) + '</span>';
+          window.__importing = false; return;
+        }
+        resultsDiv.innerHTML = '<span style="color:#aaa">Processed ' + Math.min(i + 200, rows.length) + ' / ' + rows.length + '...</span>';
+      }
+      window.__importing = false;
+      var html = '<div style="color:#4ade80;margin-bottom:8px;font-weight:600;">Import complete!</div>';
+      html += '<div>Imported: ' + totalImported + ' | Updated: ' + totalUpdated;
+      html += ' | Skipped (existing): ' + totalSkippedExisting;
+      html += ' | Skipped (pending): ' + totalSkippedPending;
+      html += ' | Skipped (opted-out): ' + totalSkippedOptedOut;
+      if (totalOptIn) html += ' | Opt-in SMS queued: ' + totalOptIn;
+      html += '</div>';
+      if (allInvalid.length > 0) {
+        html += '<div style="color:#ef4444;margin-top:8px;">Invalid (' + allInvalid.length + '):</div>';
+        html += '<ul style="margin:4px 0 0 16px;color:#f87171;">';
+        var shown = allInvalid.slice(0, 20);
+        for (var j = 0; j < shown.length; j++) {
+          html += '<li>' + escHtml(shown[j].raw || '') + ': ' + escHtml(shown[j].reason) + '</li>';
+        }
+        html += '</ul>';
+        if (allInvalid.length > 20) html += '<div style="color:#888">...and ' + (allInvalid.length - 20) + ' more</div>';
+      }
+      resultsDiv.innerHTML = html;
+      setTimeout(function() { location.reload(); }, 3000);
+    });
 
     // Block button handler
     document.addEventListener('click', (e) => {

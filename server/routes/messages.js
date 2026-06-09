@@ -12,7 +12,8 @@ router.get('/messages', requireAuth, async (req, res) => {
          c.opted_in,
          c.opted_out,
          c.pending_message,
-         c.opt_in_method
+         c.opt_in_method,
+         c.first_name
        FROM messages m
        LEFT JOIN contacts c ON m.phone = c.phone_number
        WHERE m.timestamp >= NOW() - INTERVAL '2 hours'
@@ -36,7 +37,7 @@ router.patch('/messages/:id/read', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
       `WITH updated AS (UPDATE messages SET read = $1 WHERE id = $2 RETURNING *)
-       SELECT u.*, c.opted_in, c.opted_out FROM updated u
+       SELECT u.*, c.opted_in, c.opted_out, c.first_name FROM updated u
        LEFT JOIN contacts c ON u.phone = c.phone_number`,
       [read, id]
     );
@@ -118,7 +119,7 @@ router.post('/messages/:id/reply', requireAuth, async (req, res) => {
          UPDATE messages SET replied = true, reply_text = $1, replied_at = NOW(), read = true
          WHERE id = $2 RETURNING *
        )
-       SELECT u.*, c.opted_in, c.opted_out FROM updated u
+       SELECT u.*, c.opted_in, c.opted_out, c.first_name FROM updated u
        LEFT JOIN contacts c ON u.phone = c.phone_number`,
       [replyText, id]
     );

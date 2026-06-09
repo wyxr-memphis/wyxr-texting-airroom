@@ -118,7 +118,7 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
       // Broadcast to DJs so they can see the message (Reply is gated on opt-in status)
       const io = req.app.get('io');
       if (io) {
-        io.emit('message:new', { ...message, opted_in: false });
+        io.emit('message:new', { ...message, opted_in: false, first_name: null });
       }
 
       console.log('New contact - opt-in request sent, message broadcast to DJs:', From);
@@ -146,7 +146,7 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
       // Broadcast to DJs (include opted_in so Reply button appears immediately)
       const io = req.app.get('io');
       if (io) {
-        io.emit('message:new', { ...message, opted_in: true });
+        io.emit('message:new', { ...message, opted_in: true, first_name: contact.first_name });
       }
       console.log('Message broadcast to DJs (opted-in contact)');
       res.type('text/xml');
@@ -185,7 +185,7 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
           if (originalMessage.rows.length > 0) {
             const io = req.app.get('io');
             if (io) {
-              io.emit('message:new', originalMessage.rows[0]);
+              io.emit('message:new', { ...originalMessage.rows[0], opted_in: true, first_name: contact.first_name });
             }
             console.log('Original pending message forwarded to DJs:', contact.pending_message);
           }
@@ -217,7 +217,7 @@ router.post('/sms', express.urlencoded({ extended: false }), async (req, res) =>
       // Broadcast to DJs (Reply remains gated on opt-in status)
       const io = req.app.get('io');
       if (io) {
-        io.emit('message:new', { ...message, opted_in: false });
+        io.emit('message:new', { ...message, opted_in: false, first_name: contact.first_name });
       }
 
       console.log('Pending contact - reminder sent, message broadcast to DJs:', From);

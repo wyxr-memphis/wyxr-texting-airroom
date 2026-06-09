@@ -19,6 +19,7 @@ const MessageCard = ({ message, onMarkRead, onReply }) => {
       {!message.read && <div className="unread-indicator" />}
 
       <div className="message-header">
+        {message.first_name && <span className="message-name">{message.first_name}</span>}
         <span className="message-phone">{formatPhoneNumber(message.phone)}</span>
         <span className="message-time">{formatTime(message.timestamp)}</span>
       </div>

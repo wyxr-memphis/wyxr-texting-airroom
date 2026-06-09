@@ -55,6 +55,16 @@
   gap: 12px;
 }
 
+.message-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: #E9407A;
+}
+
+.message-card.read .message-name {
+  color: #2B9EB3;
+}
+
 .message-phone {
   font-weight: 700;
   font-size: 16px;

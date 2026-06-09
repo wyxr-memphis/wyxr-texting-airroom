@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   last_message_timestamp TIMESTAMPTZ,
   opted_out BOOLEAN NOT NULL DEFAULT false,
   opted_out_timestamp TIMESTAMPTZ,
+  source VARCHAR(100),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
