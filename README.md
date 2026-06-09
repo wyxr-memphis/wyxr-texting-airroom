@@ -8,18 +8,21 @@ Real-time text messaging application for WYXR radio station. Listeners text a de
 **Text Number:** [Contact WYXR for number]
 **Login:** Contact WYXR staff for credentials
 
-**Note:** This app is designed for desktop/laptop use. Mobile browsers may have issues with session cookies. Please use on a desktop computer or laptop for best results.
+**Admin Panel:** https://wyxr-texting-airroom.onrender.com/admin/login (works on mobile)
 
 ## Features
 
 - **Real-time Messaging**: WebSocket-powered instant message delivery
 - **Conversation Threading**: Messages from the same listener grouped into a single thread, sorted by most recent activity
-- **12-Hour Display Window**: Shows messages from the last 12 hours only (stored permanently)
-- **Read/Unread Tracking**: Unread threads glow yellow with pink border; read threads are gray
+- **2-Hour Display Window**: Shows messages from the last 2 hours only (stored permanently for admin review)
+- **Contact Names**: Listener first names shown on message cards; editable in admin panel
+- **Read/Unread Tracking**: Unread messages glow yellow with pink border; read messages are gray
 - **SMS Replies**: DJs can reply to listeners who have opted in (A2P 10DLC approved)
 - **Power Toggle**: Turn messaging on/off
 - **Quick Reply Templates**: 4 predefined response templates
 - **Simple Authentication**: Universal username/password login
+- **Admin Panel**: Full message history, contact management (CSV import, manual add, name editing, block/unblock)
+- **TCPA-Compliant Opt-In**: All contacts go through SMS opt-in; STOP is always honored; opted-out numbers can never be re-added
 - **WYXR Branding**: Custom color scheme (Yellow #FFC629, Pink #E9407A, Blue #2B9EB3, Dark #2B2B2B)
 
 ## Tech Stack
@@ -221,9 +224,7 @@ For local development with Twilio:
    - Set **Root Directory** to `client`
 
 2. **Configure Environment Variables**:
-   ```
-   REACT_APP_API_URL=<your-railway-url>
-   ```
+   No environment variables needed — API calls use Vercel rewrites to proxy to Render.
 
 3. **Deploy**: Vercel auto-deploys on git push
 
@@ -253,13 +254,19 @@ After deploying frontend to Vercel:
 - `POST /api/logout` - Logout
 
 ### Messages
-- `GET /api/messages` - Get messages from last 12 hours
+- `GET /api/messages` - Get messages from last 2 hours
 - `PATCH /api/messages/:id/read` - Toggle read status
 - `POST /api/messages/:id/reply` - Send SMS reply
 
 ### Settings
 - `GET /api/settings/messaging-enabled` - Get messaging status
 - `POST /api/settings/messaging-enabled` - Toggle messaging on/off
+
+### Admin (session auth required)
+- `GET /admin/messages` - Full message history (server-rendered)
+- `GET /admin/contacts` - Contact list with import/edit UI (server-rendered)
+- `POST /admin/contacts/import` - Bulk import contacts (JSON, max 200/batch)
+- `PATCH /admin/contacts/:phone` - Update contact first name
 
 ### Webhook
 - `POST /webhook/sms` - Twilio incoming SMS webhook
@@ -277,7 +284,7 @@ After deploying frontend to Vercel:
 ## Usage
 
 1. **Login**: Enter credentials to access the dashboard
-2. **View Messages**: Messages from the last 12 hours, grouped by listener into conversation threads
+2. **View Messages**: Messages from the last 2 hours, grouped by listener into conversation threads; contact names shown if available
 3. **Mark All Read**: Click "Mark All Read" on a thread to clear all unread messages in it
 4. **Reply to Message**: Click "Reply" on any thread where the listener has opted in
 5. **Quick Replies**: Use predefined templates or write custom reply
@@ -316,11 +323,11 @@ After deploying frontend to Vercel:
 ### Build/deployment errors
 - Ensure all environment variables are set
 - Check Node.js version compatibility
-- Review Railway/Vercel build logs
+- Review Render/Vercel build logs
 
 ## Development Notes
 
-- Messages are permanently stored but only displayed if within 12 hours
+- Messages are permanently stored but only displayed if within 2 hours (full history in admin panel)
 - Session persists for 30 days
 - WebSocket automatically reconnects on disconnect
 - All timestamps are stored in UTC
