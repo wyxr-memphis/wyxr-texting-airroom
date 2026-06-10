@@ -19,6 +19,7 @@ const groupIntoConversations = (messages) => {
     const unread = sorted.filter(m => !m.read);
     const opted_in = sorted.some(m => m.opted_in === true);
     const latestTimestamp = sorted[sorted.length - 1].timestamp;
+    const first_name = sorted.find(m => m.first_name)?.first_name || null;
 
     return {
       phone,
@@ -27,6 +28,7 @@ const groupIntoConversations = (messages) => {
       unreadCount: unread.length,
       opted_in,
       latestTimestamp,
+      first_name,
     };
   }).sort(
     (a, b) => new Date(b.latestTimestamp) - new Date(a.latestTimestamp)

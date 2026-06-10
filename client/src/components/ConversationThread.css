@@ -40,6 +40,16 @@
   gap: 12px;
 }
 
+.thread-name {
+  font-weight: 700;
+  font-size: 16px;
+  color: #E9407A;
+}
+
+.conversation-thread.all-read .thread-name {
+  color: #2B9EB3;
+}
+
 .thread-phone {
   font-weight: 700;
   font-size: 16px;

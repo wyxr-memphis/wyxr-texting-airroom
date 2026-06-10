@@ -4,7 +4,7 @@ import { formatPhoneNumber, formatTime } from '../utils/formatters';
 import './ConversationThread.css';
 
 const ConversationThread = ({ conversation, onMarkRead, onReply }) => {
-  const { phone, messages, hasUnread, opted_in, unreadCount } = conversation;
+  const { phone, messages, hasUnread, opted_in, unreadCount, first_name } = conversation;
   const latestMessage = messages[messages.length - 1];
 
   const handleMarkAllRead = () => {
@@ -19,6 +19,7 @@ const ConversationThread = ({ conversation, onMarkRead, onReply }) => {
   return (
     <div className={`conversation-thread ${hasUnread ? 'has-unread' : 'all-read'}`}>
       <div className="thread-header">
+        {first_name && <span className="thread-name">{first_name}</span>}
         <span className="thread-phone">{formatPhoneNumber(phone)}</span>
         <div className="thread-header-right">
           {hasUnread && (
