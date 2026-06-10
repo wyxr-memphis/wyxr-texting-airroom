@@ -2077,7 +2077,7 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
 
     function parseCSV(text) {
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      var lines = text.split(/\r?\n/).filter(function(l) { return l.trim(); });
+      var lines = text.split(/\\r?\\n/).filter(function(l) { return l.trim(); });
       if (lines.length < 2) return [];
       var headers = parseCSVRow(lines[0]).map(function(h) { return h.trim().toLowerCase(); });
       var phoneIdx = headers.indexOf('phone');
