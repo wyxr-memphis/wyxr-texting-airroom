@@ -1407,6 +1407,12 @@ router.patch('/contacts/:phone', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // Broadcast to DJ dashboards so names update in real time
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('contact:updated', { phone, first_name: name });
+    }
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating contact name:', error);

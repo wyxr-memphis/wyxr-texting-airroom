@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-const useWebSocket = (authenticated, wsToken, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect) => {
+const useWebSocket = (authenticated, wsToken, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect, onContactUpdated) => {
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -60,6 +60,11 @@ const useWebSocket = (authenticated, wsToken, onMessageNew, onMessageUpdated, on
       if (onSettingsUpdated) onSettingsUpdated(settings);
     });
 
+    socket.on('contact:updated', (contact) => {
+      console.log('Contact updated:', contact);
+      if (onContactUpdated) onContactUpdated(contact);
+    });
+
     socket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error);
     });
@@ -67,7 +72,7 @@ const useWebSocket = (authenticated, wsToken, onMessageNew, onMessageUpdated, on
     return () => {
       socket.disconnect();
     };
-  }, [authenticated, wsToken, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect]);
+  }, [authenticated, wsToken, onMessageNew, onMessageUpdated, onSettingsUpdated, onReconnect, onContactUpdated]);
 
   return socketRef.current;
 };

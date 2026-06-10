@@ -51,8 +51,14 @@ function App() {
     }
   }, []);
 
+  const handleContactUpdated = useCallback((contact) => {
+    setMessages((prev) =>
+      prev.map((msg) => msg.phone === contact.phone ? { ...msg, first_name: contact.first_name } : msg)
+    );
+  }, []);
+
   // Initialize WebSocket — only once wsToken is available (prevents auth failures)
-  useWebSocket(authenticated, wsToken, handleMessageNew, handleMessageUpdated, handleSettingsUpdated, fetchMessages);
+  useWebSocket(authenticated, wsToken, handleMessageNew, handleMessageUpdated, handleSettingsUpdated, fetchMessages, handleContactUpdated);
 
   // Check authentication on mount
   useEffect(() => {
