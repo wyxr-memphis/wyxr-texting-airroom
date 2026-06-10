@@ -2087,7 +2087,7 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
       if (lines.length < 2) return [];
       var headers = parseCSVRow(lines[0]).map(function(h) { return h.trim().toLowerCase(); });
       var phoneIdx = headers.indexOf('phone');
-      var nameIdx = headers.indexOf('name');
+      var nameIdx = headers.findIndex(function(h) { return h === 'name' || h === 'first name' || h === 'firstname'; });
       if (phoneIdx === -1) return null;
       var rows = [], seen = {};
       for (var i = 1; i < lines.length; i++) {
