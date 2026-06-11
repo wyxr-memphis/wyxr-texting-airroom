@@ -615,7 +615,7 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
         <tbody>
           ${messages.map(msg => `
             <tr data-id="${msg.id}">
-              <td class="phone">${formatPhone(msg.phone)}</td>
+              <td class="phone">${escapeHtml(formatPhone(msg.phone))}</td>
               <td class="message-text">
                 ${escapeHtml(msg.text)}
                 ${msg.replied ? `<div class="reply-text">↳ Reply: ${escapeHtml(msg.reply_text || '')}</div>` : ''}
@@ -628,10 +628,10 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
               <td>
                 <div class="action-cell">
                   <button class="btn btn-read-toggle read-toggle-btn" data-id="${msg.id}" data-read="${msg.read}">${msg.read ? 'Mark Unread' : 'Mark Read'}</button>
-                  ${msg.opted_in ? `<button class="btn btn-reply reply-btn" data-id="${msg.id}" data-phone="${msg.phone}" data-text="${escapeHtml(msg.text)}">Reply</button>` : ''}
+                  ${msg.opted_in ? `<button class="btn btn-reply reply-btn" data-id="${msg.id}" data-phone="${escapeHtml(msg.phone)}" data-text="${escapeHtml(msg.text)}">Reply</button>` : ''}
                   ${blockedPhoneSet.has(msg.phone)
                     ? '<span class="badge badge-blocked">Blocked</span>'
-                    : `<button class="btn btn-warning block-btn" data-phone="${msg.phone}">Block</button>`
+                    : `<button class="btn btn-warning block-btn" data-phone="${escapeHtml(msg.phone)}">Block</button>`
                   }
                   <button class="btn btn-danger delete-btn" data-id="${msg.id}">Delete</button>
                 </div>
@@ -663,13 +663,13 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
           <tbody>
             ${blockedNumbers.map(block => `
               <tr>
-                <td class="phone">${formatPhone(block.phone)}</td>
+                <td class="phone">${escapeHtml(formatPhone(block.phone))}</td>
                 <td class="timestamp">${formatDate(block.blocked_at)}</td>
                 <td>${escapeHtml(block.blocked_by || 'N/A')}</td>
                 <td>${escapeHtml(block.reason || 'No reason')}</td>
                 <td>${escapeHtml(block.notes || '-')}</td>
                 <td>
-                  <button class="btn btn-primary unblock-btn" data-phone="${block.phone}">Unblock</button>
+                  <button class="btn btn-primary unblock-btn" data-phone="${escapeHtml(block.phone)}">Unblock</button>
                 </td>
               </tr>
             `).join('')}
@@ -769,7 +769,7 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
 
       tbody.innerHTML = messages.map(msg => \`
         <tr data-id="\${msg.id}">
-          <td class="phone">\${formatPhone(msg.phone)}</td>
+          <td class="phone">\${escapeHtml(formatPhone(msg.phone))}</td>
           <td class="message-text">
             \${escapeHtml(msg.text)}
             \${msg.replied ? \`<div class="reply-text">↳ Reply: \${escapeHtml(msg.reply_text || '')}</div>\` : ''}
@@ -783,8 +783,8 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
           <td>
             <div class="action-cell">
               <button class="btn btn-read-toggle read-toggle-btn" data-id="\${msg.id}" data-read="\${msg.read}">\${msg.read ? 'Mark Unread' : 'Mark Read'}</button>
-              \${msg.opted_in ? \`<button class="btn btn-reply reply-btn" data-id="\${msg.id}" data-phone="\${msg.phone}" data-text="\${escapeHtml(msg.text)}">Reply</button>\` : ''}
-              \${!msg.is_blocked ? \`<button class="btn btn-warning block-btn" data-phone="\${msg.phone}">Block</button>\` : '<span class="badge badge-blocked">Blocked</span>'}
+              \${msg.opted_in ? \`<button class="btn btn-reply reply-btn" data-id="\${msg.id}" data-phone="\${escapeHtml(msg.phone)}" data-text="\${escapeHtml(msg.text)}">Reply</button>\` : ''}
+              \${!msg.is_blocked ? \`<button class="btn btn-warning block-btn" data-phone="\${escapeHtml(msg.phone)}">Block</button>\` : '<span class="badge badge-blocked">Blocked</span>'}
               <button class="btn btn-danger delete-btn" data-id="\${msg.id}">Delete</button>
             </div>
           </td>
@@ -1936,7 +1936,7 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
           }
 
           const methodBadge = contact.opt_in_method
-            ? `<span class="method-badge">${contact.opt_in_method.toUpperCase()}</span>`
+            ? `<span class="method-badge">${escapeHtml(contact.opt_in_method.toUpperCase())}</span>`
             : '';
 
           const pendingMsg = contact.pending_message
@@ -1944,8 +1944,8 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
             : '<span class="timestamp">—</span>';
 
           const blockAction = contact.is_blocked
-            ? `<button class="btn-unblock-contact contact-unblock-btn" data-phone="${contact.phone_number}">Unblock</button>`
-            : `<button class="btn-block-contact contact-block-btn" data-phone="${contact.phone_number}">Block</button>`;
+            ? `<button class="btn-unblock-contact contact-unblock-btn" data-phone="${escapeHtml(contact.phone_number)}">Unblock</button>`
+            : `<button class="btn-block-contact contact-block-btn" data-phone="${escapeHtml(contact.phone_number)}">Block</button>`;
 
           const nameDisplay = contact.first_name
             ? `<span class="contact-name-display">${escapeHtml(contact.first_name)}</span>`
@@ -1955,7 +1955,7 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
 
           return `
             <tr>
-              <td><strong>${formatPhone(contact.phone_number)}</strong></td>
+              <td><strong>${escapeHtml(formatPhone(contact.phone_number))}</strong></td>
               ${nameCell}
               <td>${statusBadge}</td>
               <td>${methodBadge || '<span class="timestamp">—</span>'}</td>

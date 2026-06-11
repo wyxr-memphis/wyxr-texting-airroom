@@ -46,6 +46,15 @@ const logOptInAction = async (phone, actionType, method, userMessage, systemResp
 router.post('/sms', express.urlencoded({ extended: false }), validateTwilioRequest, async (req, res) => {
   const { From, Body } = req.body;
 
+  // Defense in depth: Twilio always sends E.164 numbers, so anything else is
+  // forged or garbled. The phone value ends up interpolated into admin HTML
+  // and outbound SMS calls — reject it here rather than trusting it.
+  if (typeof From !== 'string' || !/^\+\d{8,15}$/.test(From) || typeof Body !== 'string') {
+    console.warn('Webhook rejected: malformed From/Body', { from: From });
+    res.type('text/xml');
+    return res.send('<Response></Response>');
+  }
+
   console.log('Incoming SMS:', { from: From, body: Body });
 
   try {
