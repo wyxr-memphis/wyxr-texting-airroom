@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
 const { requireAuth, requireAuthAdmin } = require('../middleware/auth');
+const { verifyCredentials } = require('../utils/credentials');
+const { loginLimiters } = require('../middleware/loginLimiter');
 
 // GET /admin/login - Login form for admin panel
 router.get('/login', (req, res) => {
@@ -46,16 +48,14 @@ router.get('/login', (req, res) => {
 });
 
 // POST /admin/login - Authenticate and redirect
-router.post('/login', (req, res) => {
+router.post('/login', ...loginLimiters, (req, res) => {
   const { username, password } = req.body;
-  if (
-    username === process.env.AUTH_USERNAME &&
-    password === process.env.AUTH_PASSWORD
-  ) {
+  if (verifyCredentials(username, password)) {
     req.session.authenticated = true;
     req.session.username = username;
     return res.redirect('/admin/messages');
   }
+  console.warn(`Failed login attempt on /admin/login from IP ${req.ip}`);
   return res.redirect('/admin/login?error=1');
 });
 
