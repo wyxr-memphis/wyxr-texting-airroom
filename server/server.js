@@ -70,6 +70,29 @@ app.set('io', io);
 // Setup WebSocket handlers
 setupWebSocket(io);
 
+// CSRF protection: production session cookies use sameSite 'none', so the
+// browser attaches them to cross-site requests — a malicious page could
+// submit a plain HTML form to authenticated endpoints with a logged-in DJ's
+// cookie. Reject state-changing requests unless the Origin header is present
+// and one of ours. Same-origin form/fetch POSTs send an Origin header in all
+// modern browsers, so the admin HTML pages keep working. /webhook is mounted
+// above this middleware (Twilio signs its requests instead), and the login
+// routes are exempt (they're what creates the session in the first place).
+const csrfExemptPaths = new Set(['/api/login', '/admin/login']);
+const csrfAllowedOrigins = [
+  ...allowedOrigins,
+  // Admin pages are served by this server itself on localhost in dev
+  `http://localhost:${process.env.PORT || 3001}`
+];
+app.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  if (csrfExemptPaths.has(req.path)) return next();
+  const origin = req.headers.origin;
+  if (origin && csrfAllowedOrigins.includes(origin)) return next();
+  console.warn(`Blocked cross-site ${req.method} ${req.path} (Origin: ${origin || 'missing'}, IP: ${req.ip})`);
+  return res.status(403).json({ error: 'Cross-site request blocked' });
+});
+
 // Routes
 const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
