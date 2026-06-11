@@ -123,9 +123,11 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Global error handlers to prevent silent crashes
+// After an uncaught exception the process may be in a corrupt state — log
+// and exit so Render restarts the service cleanly.
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught exception:', err);
+  console.error('Uncaught exception, exiting:', err);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
