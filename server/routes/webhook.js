@@ -1,7 +1,19 @@
 const express = require('express');
 const router = express.Router();
+const twilio = require('twilio');
 const pool = require('../config/database');
 const twilioService = require('../services/twilio');
+
+// Validate X-Twilio-Signature against TWILIO_AUTH_TOKEN so only Twilio can
+// post to this webhook. The signature is computed over the exact public URL
+// Twilio posts to; the app sits behind Render's proxy, so that URL must be
+// set explicitly via TWILIO_WEBHOOK_URL (e.g.
+// https://wyxr-texting-airroom.onrender.com/webhook/sms). Validation is
+// disabled outside production so local curl/ngrok testing still works.
+const validateTwilioRequest = twilio.webhook({
+  validate: process.env.NODE_ENV === 'production',
+  url: process.env.TWILIO_WEBHOOK_URL
+});
 
 // Keyword detection helpers
 const isYesKeyword = (text) => {
@@ -31,8 +43,17 @@ const logOptInAction = async (phone, actionType, method, userMessage, systemResp
 };
 
 // POST /webhook/sms - Twilio incoming SMS webhook
-router.post('/sms', express.urlencoded({ extended: false }), async (req, res) => {
+router.post('/sms', express.urlencoded({ extended: false }), validateTwilioRequest, async (req, res) => {
   const { From, Body } = req.body;
+
+  // Defense in depth: Twilio always sends E.164 numbers, so anything else is
+  // forged or garbled. The phone value ends up interpolated into admin HTML
+  // and outbound SMS calls — reject it here rather than trusting it.
+  if (typeof From !== 'string' || !/^\+\d{8,15}$/.test(From) || typeof Body !== 'string') {
+    console.warn('Webhook rejected: malformed From/Body', { from: From });
+    res.type('text/xml');
+    return res.send('<Response></Response>');
+  }
 
   console.log('Incoming SMS:', { from: From, body: Body });
 

@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const { verifyCredentials } = require('../utils/credentials');
+const { loginLimiters } = require('../middleware/loginLimiter');
 
 // Generate a signed WebSocket token from a session ID.
 // Allows the client to auth the socket directly with Render without needing
@@ -14,18 +16,16 @@ function makeWsToken(sessionId) {
 }
 
 // POST /api/login
-router.post('/login', (req, res) => {
+router.post('/login', ...loginLimiters, (req, res) => {
   const { username, password } = req.body;
 
-  if (
-    username === process.env.AUTH_USERNAME &&
-    password === process.env.AUTH_PASSWORD
-  ) {
+  if (verifyCredentials(username, password)) {
     req.session.authenticated = true;
     req.session.username = username;
     return res.json({ success: true, username, wsToken: makeWsToken(req.session.id) });
   }
 
+  console.warn(`Failed login attempt on /api/login from IP ${req.ip}`);
   return res.status(401).json({ error: 'Invalid credentials' });
 });
 

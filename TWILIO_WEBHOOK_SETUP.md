@@ -141,6 +141,13 @@ cd /Users/robbygrant/scripts/wyxr-texting-airroom
 
 You'll need to update the Twilio webhook URL each time you restart ngrok.
 
+### Webhook Signature Validation
+In production (`NODE_ENV=production`), the server validates Twilio's
+`X-Twilio-Signature` header and rejects forged requests with 403. The
+`TWILIO_WEBHOOK_URL` env var must exactly match the webhook URL configured in
+the Twilio console. Validation is skipped in development, so local curl/ngrok
+testing works without a signature.
+
 **Tip:** Keep ngrok running in the background during your entire development session.
 
 ### ngrok Free Tier Limitations

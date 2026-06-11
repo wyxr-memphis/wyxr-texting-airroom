@@ -6,7 +6,7 @@
 
 ### Application Access
 - **App URL:** https://wyxr-texting-airroom.vercel.app
-- **Username:** wyxr
+- **Username:** [Contact station management]
 - **Password:** [Contact station management]
 
 ### Twilio
