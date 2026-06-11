@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const cors = require('cors');
+const helmet = require('helmet');
 const pool = require('./config/database');
 const sessionConfig = require('./config/session');
 const setupWebSocket = require('./websocket/handlers');
@@ -32,6 +33,11 @@ const io = new Server(server, {
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
+
+// Security headers (X-Frame-Options, nosniff, etc.). CSP is disabled for
+// now: the server-rendered admin pages rely on inline <script>/<style>, so a
+// strict CSP would break them.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // Middleware
 app.use(cors({
