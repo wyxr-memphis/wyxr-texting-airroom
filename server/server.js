@@ -36,8 +36,15 @@ if (process.env.NODE_ENV === 'production') {
 
 // Security headers (X-Frame-Options, nosniff, etc.). CSP is disabled for
 // now: the server-rendered admin pages rely on inline <script>/<style>, so a
-// strict CSP would break them.
-app.use(helmet({ contentSecurityPolicy: false }));
+// strict CSP would break them. Referrer-Policy must NOT be helmet's default
+// 'no-referrer': pages served under that policy make Chrome send
+// "Origin: null" even on same-origin form/fetch POSTs, which broke admin
+// login. The browser-default policy keeps Origin intact while still
+// trimming the referrer path on cross-origin requests.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
 
 // Twilio webhook — mounted BEFORE the global body parsers so the route's own
 // urlencoded parser (extended: false) parses the body. Signature validation
@@ -81,7 +88,10 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+    // Disallowed origin: respond without CORS headers (the browser blocks
+    // cross-origin reads) instead of erroring — an Error here became a 500
+    // for ordinary page requests that happened to carry an Origin header.
+    return callback(null, false);
   },
   credentials: true,
   exposedHeaders: ['set-cookie']
