@@ -141,7 +141,7 @@ router.post('/messages/:id/reply', requireAuth, async (req, res) => {
     res.json(updatedMessage);
   } catch (error) {
     console.error('Error sending reply:', error);
-    res.status(500).json({ error: 'Failed to send reply: ' + error.message });
+    res.status(500).json({ error: 'Failed to send reply' });
   }
 });
 
