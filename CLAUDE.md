@@ -109,11 +109,12 @@ This is enforced in `server/routes/messages.js` GET endpoint. All messages remai
 ```bash
 DATABASE_URL=postgresql://localhost:5432/wyxr_texts
 SESSION_SECRET=<random-secret>
-AUTH_USERNAME=wyxr
+AUTH_USERNAME=<your-username>
 AUTH_PASSWORD=<secure-password>
 TWILIO_ACCOUNT_SID=<twilio-sid>
 TWILIO_AUTH_TOKEN=<twilio-token>
 TWILIO_PHONE_NUMBER=+1234567890
+TWILIO_WEBHOOK_URL=<public-webhook-url>   # signature validation in production
 PORT=3001
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000

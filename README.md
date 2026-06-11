@@ -113,7 +113,7 @@ DATABASE_URL=postgresql://localhost:5432/wyxr_texts
 SESSION_SECRET=your-secret-key-change-this
 
 # Auth (hardcoded credentials)
-AUTH_USERNAME=wyxr
+AUTH_USERNAME=your-username
 AUTH_PASSWORD=your-secure-password
 
 # Twilio
@@ -201,7 +201,7 @@ For local development with Twilio:
 5. **Configure Environment Variables**:
    ```
    SESSION_SECRET=<generate-random-string>
-   AUTH_USERNAME=wyxr
+   AUTH_USERNAME=<your-username>
    AUTH_PASSWORD=<secure-password>
    TWILIO_ACCOUNT_SID=<your-sid>
    TWILIO_AUTH_TOKEN=<your-token>
