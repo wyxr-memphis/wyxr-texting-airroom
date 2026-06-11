@@ -46,6 +46,14 @@ app.use(cors({
   credentials: true,
   exposedHeaders: ['set-cookie']
 }));
+// Twilio webhook — mounted BEFORE the global body parsers so the route's own
+// urlencoded parser (extended: false) parses the body. Signature validation
+// requires the flat key/value params Twilio signed; the global qs parser
+// (extended: true) would decode bracket-syntax keys into nested objects and
+// break verification.
+const webhookRoutes = require('./routes/webhook');
+app.use('/webhook', webhookRoutes);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -66,14 +74,12 @@ setupWebSocket(io);
 const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
 const settingsRoutes = require('./routes/settings');
-const webhookRoutes = require('./routes/webhook');
 const adminRoutes = require('./routes/admin');
 const webOptInRoutes = require('./routes/web-opt-in');
 
 app.use('/api', authRoutes);
 app.use('/api', messagesRoutes);
 app.use('/api', settingsRoutes);
-app.use('/webhook', webhookRoutes);
 app.use('/admin', adminRoutes);
 app.use('/api/sms', webOptInRoutes);
 

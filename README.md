@@ -206,6 +206,7 @@ For local development with Twilio:
    TWILIO_ACCOUNT_SID=<your-sid>
    TWILIO_AUTH_TOKEN=<your-token>
    TWILIO_PHONE_NUMBER=<your-twilio-number>
+   TWILIO_WEBHOOK_URL=https://your-render-url.onrender.com/webhook/sms
    NODE_ENV=production
    PORT=10000
    FRONTEND_URL=<your-vercel-url>
@@ -239,6 +240,12 @@ In Twilio Console:
 - Set "A MESSAGE COMES IN" webhook to: `https://your-render-url.onrender.com/webhook/sms`
 - HTTP method: POST
 - Click "Save Configuration"
+
+**Important:** In production the webhook validates Twilio's `X-Twilio-Signature`
+header against `TWILIO_WEBHOOK_URL`. That env var must exactly match the URL
+configured in Twilio (including scheme and path). If the backend URL ever
+changes, update both the Twilio console and `TWILIO_WEBHOOK_URL`, or incoming
+SMS will be rejected with 403.
 
 ### Update CORS Configuration
 
