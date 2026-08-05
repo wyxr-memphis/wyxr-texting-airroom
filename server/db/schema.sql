@@ -100,6 +100,82 @@ CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings
 CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON contacts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Broadcasts - one row per bulk send to the opted-in list (migration 006)
+CREATE TABLE IF NOT EXISTS broadcasts (
+  id SERIAL PRIMARY KEY,
+  body TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'draft', -- draft, sending, completed, canceled
+  created_by VARCHAR(100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  confirmed_at TIMESTAMPTZ,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  canceled_at TIMESTAMPTZ,
+  canceled_by VARCHAR(100),
+  recipient_count INTEGER NOT NULL DEFAULT 0,
+  sent_count INTEGER NOT NULL DEFAULT 0,
+  failed_count INTEGER NOT NULL DEFAULT 0,
+  skipped_count INTEGER NOT NULL DEFAULT 0,
+  character_count INTEGER,
+  segment_count INTEGER,
+  encoding VARCHAR(10),
+  last_test_sent_at TIMESTAMPTZ,
+  last_test_phone VARCHAR(20),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- One row per (broadcast, phone) - makes sends resumable and prevents
+-- double-texting if the worker restarts mid-broadcast
+CREATE TABLE IF NOT EXISTS broadcast_recipients (
+  id SERIAL PRIMARY KEY,
+  broadcast_id INTEGER NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
+  phone_number VARCHAR(20) NOT NULL,
+  opt_in_method VARCHAR(20),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  twilio_sid VARCHAR(64),
+  error_code VARCHAR(20),
+  error_message TEXT,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  claimed_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ,
+  sent_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (broadcast_id, phone_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_broadcasts_status ON broadcasts(status);
+CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_broadcast_id ON broadcast_recipients(broadcast_id);
+CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_worker_queue
+  ON broadcast_recipients(broadcast_id, status, next_attempt_at);
+
+-- At most one broadcast may be actively sending at a time
+CREATE UNIQUE INDEX IF NOT EXISTS idx_broadcasts_one_active
+  ON broadcasts ((1))
+  WHERE status = 'sending';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'update_broadcasts_updated_at'
+  ) THEN
+    CREATE TRIGGER update_broadcasts_updated_at BEFORE UPDATE ON broadcasts
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'update_broadcast_recipients_updated_at'
+  ) THEN
+    CREATE TRIGGER update_broadcast_recipients_updated_at BEFORE UPDATE ON broadcast_recipients
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END
+$$;
+
 -- Insert default settings
 INSERT INTO settings (key, value) VALUES ('messaging_enabled', 'true')
 ON CONFLICT (key) DO NOTHING;

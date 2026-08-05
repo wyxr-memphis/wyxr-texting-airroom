@@ -118,11 +118,14 @@ const authRoutes = require('./routes/auth');
 const messagesRoutes = require('./routes/messages');
 const settingsRoutes = require('./routes/settings');
 const adminRoutes = require('./routes/admin');
+const broadcastRoutes = require('./routes/broadcasts');
 const webOptInRoutes = require('./routes/web-opt-in');
+const broadcastWorker = require('./services/broadcastWorker');
 
 app.use('/api', authRoutes);
 app.use('/api', messagesRoutes);
 app.use('/api', settingsRoutes);
+app.use('/admin', broadcastRoutes);
 app.use('/admin', adminRoutes);
 app.use('/api/sms', webOptInRoutes);
 
@@ -151,6 +154,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Graceful shutdown (Render sends SIGTERM before killing)
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
+  broadcastWorker.stop();
   server.close(() => {
     pool.end(() => {
       console.log('Server and database pool closed');
@@ -164,6 +168,11 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Broadcast send worker. Polls for a broadcast with status='sending' and
+  // sends one recipient per tick, so a bulk send survives restarts and
+  // free-tier spin-down. Reconciles interrupted sends against Twilio on boot.
+  broadcastWorker.start();
 
   // Keep-alive: ping own public URL to prevent Render free-tier spin-down
   if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {

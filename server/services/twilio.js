@@ -94,6 +94,22 @@ const sendHelpResponse = async (to) => {
   }
 };
 
+// Look up messages we've already sent to a number since a given time.
+//
+// Used by the broadcast worker's crash recovery: if the process dies in the
+// window between Twilio accepting a message and our DB recording it, the row
+// is stuck at status='sending' even though the text went out. Asking Twilio
+// what it actually sent is the only way to tell those apart, and it's what
+// prevents a double-text on resume. See BROADCAST_MESSAGING_SPEC.md §7.5.
+const listMessagesTo = async (to, dateSentAfter, limit = 20) => {
+  return client.messages.list({
+    to,
+    from: process.env.TWILIO_PHONE_NUMBER,
+    dateSentAfter,
+    limit
+  });
+};
+
 module.exports = {
   sendSMS,
   sendOptInRequest,
@@ -102,5 +118,6 @@ module.exports = {
   sendOptOutConfirmation,
   sendAlreadyOptedIn,
   sendHelpResponse,
+  listMessagesTo,
   MESSAGES
 };

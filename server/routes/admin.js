@@ -4,6 +4,7 @@ const pool = require('../config/database');
 const { requireAuth, requireAuthAdmin } = require('../middleware/auth');
 const { verifyCredentials } = require('../utils/credentials');
 const { loginLimiters } = require('../middleware/loginLimiter');
+const { escapeHtml } = require('../utils/html');
 
 // GET /admin/login - Login form for admin panel
 router.get('/login', (req, res) => {
@@ -544,6 +545,7 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
     <div class="nav-links">
       <a href="/admin/messages" class="nav-link active">Messages</a>
       <a href="/admin/contacts" class="nav-link">Contacts</a>
+      <a href="/admin/broadcasts" class="nav-link">Broadcasts</a>
     </div>
   </div>
 
@@ -1842,6 +1844,7 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
     <div class="nav-links">
       <a href="/admin/messages" class="nav-link">Messages</a>
       <a href="/admin/contacts" class="nav-link active">Contacts</a>
+      <a href="/admin/broadcasts" class="nav-link">Broadcasts</a>
     </div>
   </div>
 
@@ -2245,15 +2248,5 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
     res.status(500).send('Error loading contacts');
   }
 });
-
-function escapeHtml(text) {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
 
 module.exports = router;
