@@ -56,7 +56,17 @@ const getRecipientCounts = async () => {
            AND c.opted_out = false
            AND c.opt_in_method = 'import'
            AND NOT EXISTS (SELECT 1 FROM blocked_numbers b WHERE b.phone = c.phone_number)
-       ) AS excluded_imported
+       ) AS excluded_imported,
+       -- Imported contacts already asked to re-confirm, waiting on a YES.
+       COUNT(*) FILTER (
+         WHERE c.opt_in_method = 'import'
+           AND c.opted_in = false
+           AND c.opted_out = false
+           AND EXISTS (
+             SELECT 1 FROM opt_in_log l
+             WHERE l.phone_number = c.phone_number AND l.action_type = 'reconsent_request'
+           )
+       ) AS awaiting_reconsent
      FROM contacts c`,
     [ELIGIBLE_METHODS]
   );
@@ -69,7 +79,8 @@ const getRecipientCounts = async () => {
       web: parseInt(row.web, 10),
       legacy: parseInt(row.legacy, 10)
     },
-    excludedImported: parseInt(row.excluded_imported, 10)
+    excludedImported: parseInt(row.excluded_imported, 10),
+    awaitingReconsent: parseInt(row.awaiting_reconsent, 10)
   };
 };
 

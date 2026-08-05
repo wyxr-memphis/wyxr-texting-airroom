@@ -15,6 +15,7 @@ const { normalizePhone } = require('../utils/phone');
 const twilioService = require('../services/twilio');
 const { measure, fullTextFor, findShorteners, COMPLIANCE_SUFFIX } = require('../utils/smsText');
 const { getRecipientCounts, snapshotRecipients } = require('../services/broadcastAudience');
+const reconsent = require('../services/reconsent');
 
 const MAX_CHARACTERS = parseInt(process.env.BROADCAST_MAX_CHARACTERS || '1200', 10);
 const MAX_RECIPIENTS = parseInt(process.env.BROADCAST_MAX_RECIPIENTS || '2000', 10);
@@ -52,6 +53,35 @@ router.get('/broadcasts/recipient-count', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error counting broadcast recipients:', error);
     res.status(500).json({ error: 'Failed to count recipients' });
+  }
+});
+
+// POST /admin/contacts/request-reconsent
+//
+// Texts the standard opt-in request to CSV-imported contacts so they can
+// confirm on our own number. Replying YES converts them to opt_in_method='sms'
+// via the normal webhook path and they enter the broadcast audience. See
+// services/reconsent.js for why this exists rather than trusting the flag.
+router.post('/contacts/request-reconsent', requireAuth, async (req, res) => {
+  try {
+    const { queued } = await reconsent.startRun(req.session.username);
+    if (queued === 0) {
+      return res.json({ queued: 0, message: 'No imported contacts are waiting to be asked.' });
+    }
+    console.log(
+      `[reconsent] ${req.session.username || 'unknown'} started a run for ${queued} contact(s)`
+    );
+    res.json({
+      queued,
+      message: `Opt-in request queued for ${queued} contact${queued === 1 ? '' : 's'}. `
+        + `This takes about ${Math.ceil((queued * 1.1) / 60)} minute(s) to send.`
+    });
+  } catch (error) {
+    if (error.code === 'RECONSENT_ACTIVE') {
+      return res.status(409).json({ error: error.message });
+    }
+    console.error('Error starting re-permission run:', error);
+    res.status(500).json({ error: 'Failed to start the re-permission run' });
   }
 });
 
@@ -506,14 +536,33 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
   try {
     const counts = await getRecipientCounts();
 
-    const importedNote = counts.excludedImported > 0
-      ? `<p class="muted" style="margin-top:14px;">
-           ${counts.excludedImported} imported contact${counts.excludedImported === 1 ? '' : 's'}
-           ${counts.excludedImported === 1 ? 'is' : 'are'} not included. Their opt-in was attested by
-           staff at import rather than confirmed by the listener. To include them, re-import without
-           the consent attestation so they receive a confirmation text — replying YES makes them
-           eligible automatically.
+    const awaitingNote = counts.awaitingReconsent > 0
+      ? `<p class="muted" style="margin-top:10px;">
+           ${counts.awaitingReconsent} ${counts.awaitingReconsent === 1 ? 'has' : 'have'} already been
+           asked and ${counts.awaitingReconsent === 1 ? 'is' : 'are'} waiting to reply YES.
          </p>`
+      : '';
+
+    const importedPanel = counts.excludedImported > 0
+      ? `
+  <div class="panel">
+    <h2>${counts.excludedImported} imported contact${counts.excludedImported === 1 ? '' : 's'} not included</h2>
+    <p class="muted">
+      These came in by CSV import, so their opt-in is recorded as a staff attestation rather than
+      something the listener did on this number — and nearly none of them has ever texted us. Sending
+      a first-ever message to a block of numbers with no history here is what triggers carrier
+      filtering, which would hurt ordinary DJ replies too.
+    </p>
+    <p class="muted" style="margin-top:10px;">
+      Ask them to confirm instead. Each gets the standard opt-in request; replying YES moves them to a
+      confirmed opt-in on our own number and they join the broadcast audience automatically.
+    </p>
+    ${awaitingNote}
+    <button class="btn btn-primary" id="reconsent-btn" style="margin-top:14px;">
+      Send opt-in request to ${counts.excludedImported} contact${counts.excludedImported === 1 ? '' : 's'}
+    </button>
+    <div class="muted" id="reconsent-result" style="margin-top:12px;"></div>
+  </div>`
       : '';
 
     const body = `
@@ -543,8 +592,8 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
     <div class="counter" id="counter">0 characters &middot; 0 segments</div>
     <div class="suffix-note">This is added automatically: &ldquo;${escapeHtml(COMPLIANCE_SUFFIX.trim())}&rdquo;</div>
     <div class="warn" id="shortener-warn" style="display:none;"></div>
-    ${importedNote}
   </div>
+  ${importedPanel}
 
   <div class="panel">
     <h2>Send a test first</h2>
@@ -702,6 +751,28 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
       checkPhrase();
     }
   });
+
+  const reconsentBtn = document.getElementById('reconsent-btn');
+  if (reconsentBtn) {
+    reconsentBtn.addEventListener('click', async () => {
+      const out = document.getElementById('reconsent-result');
+      if (!confirm('Send the opt-in request to these contacts? They will each get one text asking '
+        + 'them to reply YES. Until they do, they stay out of broadcasts.')) return;
+      reconsentBtn.disabled = true;
+      out.textContent = 'Starting...';
+      try {
+        const res = await fetch('/admin/contacts/request-reconsent', {
+          method: 'POST', credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not start');
+        out.textContent = data.message;
+      } catch (err) {
+        out.textContent = err.message;
+        reconsentBtn.disabled = false;
+      }
+    });
+  }
 
   refreshCounter();
   refreshCount();
