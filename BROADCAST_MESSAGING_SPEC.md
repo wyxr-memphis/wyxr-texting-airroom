@@ -92,7 +92,7 @@ These are settled; do not re-litigate during implementation.
      -- Only listeners who opted in themselves. Excludes contacts whose opt-in was
      -- attested by staff at CSV import rather than performed by the listener.
      -- Unconditional — there is no override. See §8.3.
-     AND c.opt_in_method IN ('sms', 'web')
+     AND c.opt_in_method IN ('sms', 'web', 'legacy')
    ```
    This mirrors the reply endpoint's gating logic (§2) plus the blocked-numbers exclusion already used in `messages.js:20-22` and `admin.js`'s contacts query. The `opt_in_method` filter is **additional** to that pattern and specific to broadcasts — a 1:1 DJ reply to someone who texted in is fine regardless of how they were added; a bulk send to someone who never opted in themselves is not (§8.3).
 
@@ -240,12 +240,13 @@ No parameters — the audience rule is fixed (§3, §8.3).
 ```json
 // Response
 {
-  "count": 801,              // eligible: opt_in_method IN ('sms','web'), not opted out, not blocked
+  "count": 79,               // eligible: opt_in_method IN ('sms','web','legacy'), not opted out, not blocked
   "byMethod": {
-    "sms": 611,
-    "web": 190
+    "sms": 74,
+    "web": 0,
+    "legacy": 5
   },
-  "excludedImported": 41     // opted_in=true but staff-attested at import — never eligible (§8.3)
+  "excludedImported": 73     // opted_in=true but staff-attested at import — never eligible (§8.3)
 }
 ```
 Runs the live eligibility query from §3 every time — no caching. Called on compose-page load and again immediately before the Confirm button is enabled, so staff never act on a stale number (see §9.1).
@@ -596,6 +597,7 @@ The T&C describe consent as arising from the listener's own action — §5.2: "*
 |---|---|---|
 | `'sms'` | `server/routes/webhook.js:186` | Listener texted in and replied YES. Matches T&C §5.2 exactly. Strongest. |
 | `'web'` | `server/routes/web-opt-in.js:62,95` | Listener submitted the opt-in form; `opt_in_log` captures `consent_text`, `ip_address`, `source_url`. Strong. |
+| `'legacy'` | `server/db/migrations/003_add_contacts_and_opt_in.sql:57-67` | Backfilled from the `messages` table when the opt-in system was introduced — these are people who **texted the station themselves** before there was a confirmation flow. Consent rests on the inbound text (T&C §5.2) without a YES step. **Included by station decision** (see below). |
 | `'import'` | `server/routes/admin.js:1314,1361` | **Admin attested prior consent during CSV import.** `opted_in` is set to `true` immediately when the request passes `consented: true`, and `opt_in_log` records only `'Admin attested prior consent via CSV import (source: …)'`. |
 
 That third row is the problem. An `'import'` contact never performed any documented consumer action — no inbound text, no form submission, no captured consent text or IP. The audit trail proves *a staff member asserted* consent, not that the listener gave it. These contacts are nonetheless `opted_in = true` and would therefore be swept into the §3 eligibility query alongside everyone else.
@@ -605,8 +607,12 @@ For 1:1 DJ replies this matters little (the listener texted first in practice). 
 **Spec decision (settled — station direction is that only opted-in listeners receive broadcasts):** `opt_in_method = 'import'` contacts are excluded from broadcasts **unconditionally**. There is no override checkbox, no env var, and no `include_imported` column. The eligibility query in §3 hard-codes:
 
 ```sql
-AND c.opt_in_method IN ('sms', 'web')
+AND c.opt_in_method IN ('sms', 'web', 'legacy')
 ```
+
+**On `'legacy'` (decided against production data, not assumed):** this spec was originally written believing only three `opt_in_method` values existed. Querying production during implementation found a fourth — 5 contacts at `'legacy'`, from migration 003's backfill of the pre-opt-in `messages` table. They are **included**, because they did the thing T&C §5.2 grounds consent in: they texted the station first. They are also demonstrably live listeners rather than stale rows (three had texted within the preceding months, one two weeks before implementation). They differ from `'sms'` only in lacking the YES confirmation, which is a weaker gap than `'import'`'s complete absence of any listener action. Note that production also holds 12 contacts with a NULL `opt_in_method`, none of them `opted_in` — they fall out of the rule naturally and need no special handling.
+
+Real production composition at implementation time: **74 `sms` + 0 `web` + 5 `legacy` = 79 eligible**, with **73 `import` excluded**. That last number is worth staff attention: nearly half the opted-in contact list is staff-attested and therefore outside the broadcast audience until those listeners confirm for themselves.
 
 An earlier draft of this spec made the exclusion a *default* with a staff override. That was the wrong shape: an override checkbox invites exactly the judgment call that shouldn't be made under time pressure during an emergency broadcast, and "the flag says `opted_in = true`" is precisely the reasoning the exclusion exists to prevent.
 
@@ -614,7 +620,7 @@ An earlier draft of this spec made the exclusion a *default* with a staff overri
 
 1. Import the CSV **without** the consent attestation (omit `consented`, or send it falsy). `server/routes/admin.js:1326-1337` then inserts the contact with `opted_in = false`, `opt_in_method = 'import'`, logs `import_opt_in_request` to `opt_in_log`, and queues the standard `OPT_IN_REQUEST` SMS ("…Reply YES to confirm…") through the same rate-limited loop at `admin.js:1382-1389`.
 2. When the listener replies YES, `server/routes/webhook.js:181-191` sets `opted_in = true` **and rewrites `opt_in_method` to `'sms'`**, sends the confirmation, and writes a `confirm` row to `opt_in_log`.
-3. That contact now satisfies `opt_in_method IN ('sms', 'web')` and is picked up by the next broadcast automatically.
+3. That contact now satisfies `opt_in_method IN ('sms', 'web', 'legacy')` and is picked up by the next broadcast automatically.
 
 So the correct operational answer for staff who want imported listeners included is *ask them* — re-import without the attestation and let them confirm. That converts an attestation into real, logged, listener-performed consent. The only contacts permanently outside the broadcast audience are those who were attested-for and never confirmed, which is the intended outcome.
 
@@ -733,7 +739,7 @@ Testing this without texting the real 800+-person list:
 - Compose, status, and history admin pages (§9)
 - Compliance suffix auto-append, live segment/character counter (§8.1, §8.4)
 - `escapeHtml` on every staff-authored and contact-derived value rendered into the new admin pages (§2 — non-negotiable, this is a known-closed XSS class)
-- Consent-basis handling: `opt_in_method IN ('sms','web')` enforced in the eligibility query, per-method recipient breakdown, `opt_in_method` snapshotted per recipient (§8.3)
+- Consent-basis handling: `opt_in_method IN ('sms','web','legacy')` enforced in the eligibility query, per-method recipient breakdown, `opt_in_method` snapshotted per recipient (§8.3)
 - Safety rails: max recipients, cooldown, confirm-count re-check, typed-confirmation guard, `messaging_enabled` integration (§11)
 
 **Deferred (phase 2+):**
@@ -754,7 +760,7 @@ Testing this without texting the real 800+-person list:
 2. **~~TCR campaign use-case verification~~ — RESOLVED.** Checked in the Twilio Console: campaign is **Verified**, use case is **`MIXED`** (not Conversational-only), and the registered description explicitly includes "program updates, event announcements, and community alerts." Broadcast traffic is registered. The registered opt-in methods (JOIN double opt-in, web form) also match this spec's audience rule exactly and exclude staff attestation, corroborating §8.3. No blocker remains. See §8.2(a).
 3. **Fundraising/donation texts are not clearly authorized.** The privacy policy's "**solely** … programming, show updates, and DJ interactions" is narrower than the T&C's "occasional promotional messages." Programming and event announcements are fine; a pledge-drive ask sits in the gap. If the station wants to text donation asks — likely, for a 501(c)(3) — reconcile that privacy-policy sentence first. Policy decision, deliberately not enforced in code. See §8.2(b).
 4. **~~Imported contacts~~ — RESOLVED.** Station direction: only listeners who opted in themselves receive broadcasts. `opt_in_method = 'import'` (staff-attested) contacts are excluded unconditionally — no override, no `include_imported` column. Staff who want them included re-import without the consent attestation so the listener gets a confirmation text; replying YES flips them to `'sms'` and they become eligible automatically (§8.3).
-5. **`BROADCAST_MAX_RECIPIENTS` default.** This spec couldn't query the production database's actual current opted-in contact count from this environment. Whoever implements this should run the §3 query against production once and set a default with reasonable headroom above the current list size (e.g., 1.5–2×), not an arbitrary round number.
+5. **~~`BROADCAST_MAX_RECIPIENTS` default~~ — RESOLVED.** Production was queried during implementation: 79 eligible (74 `sms`, 0 `web`, 5 `legacy`), 73 `import` excluded. The cap ships at **2000**, far above the current list, so it acts as a runaway guard rather than a routine obstacle. Revisit if the list grows past ~1000.
 6. **Should test-send be hard-required before Confirm enables?** This spec assumes no (strongly nudged in UI, not server-enforced) to avoid blocking a genuine emergency broadcast — worth an explicit sign-off from station staff, since it trades a small safety gain for available speed.
 7. **Access control.** Should broadcast-sending require something beyond the single shared admin login (§2, §11) — e.g., a distinct credential, or a "type your name to confirm" audit field beyond what's already in `created_by`? This spec deliberately doesn't invent new auth infrastructure; it's flagged here as a real gap given the feature's blast radius.
 8. **Exact current Twilio per-segment rate.** The cost math in §10 uses a public-pricing planning estimate (~$0.012/segment all-in as of August 2026), not the station's actual account rate — confirm in the Twilio Console before quoting a number to station leadership.

@@ -530,6 +530,10 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
       <h3>Web form</h3>
       <div class="number">${counts.byMethod.web}</div>
     </div>
+    <div class="stat-card">
+      <h3>Legacy</h3>
+      <div class="number">${counts.byMethod.legacy}</div>
+    </div>
   </div>
 
   <div class="panel">

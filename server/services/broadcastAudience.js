@@ -6,7 +6,15 @@
 //
 // The rule (BROADCAST_MESSAGING_SPEC.md §3, §8.3):
 //   - opted in, not opted out, not blocked
-//   - opt_in_method IN ('sms','web') — the listener opted in themselves
+//   - opt_in_method IN ('sms','web','legacy') — the listener acted themselves
+//
+// 'sms'    listener texted in and replied YES (double opt-in)
+// 'web'    listener submitted the opt-in form at wyxr.org/text
+// 'legacy' backfilled from the messages table by migration 003 — these people
+//          texted the station before the opt-in system existed, so their
+//          consent rests on the inbound text itself (T&C §5.2) without a YES
+//          confirmation. Included by station decision: they self-initiated
+//          contact and are active listeners.
 //
 // 'import' contacts are excluded unconditionally. Their opted_in flag was set
 // by a staff attestation at CSV import rather than by any action the listener
@@ -16,7 +24,7 @@
 // which flips opt_in_method to 'sms' and makes them eligible automatically.
 const pool = require('../config/database');
 
-const ELIGIBLE_METHODS = ['sms', 'web'];
+const ELIGIBLE_METHODS = ['sms', 'web', 'legacy'];
 
 // Shared predicate. Kept as one string so the count and the insert cannot
 // disagree about who is eligible.
@@ -42,6 +50,7 @@ const getRecipientCounts = async () => {
        COUNT(*) FILTER (WHERE ${ELIGIBLE_WHERE}) AS eligible,
        COUNT(*) FILTER (WHERE ${ELIGIBLE_WHERE} AND c.opt_in_method = 'sms') AS sms,
        COUNT(*) FILTER (WHERE ${ELIGIBLE_WHERE} AND c.opt_in_method = 'web') AS web,
+       COUNT(*) FILTER (WHERE ${ELIGIBLE_WHERE} AND c.opt_in_method = 'legacy') AS legacy,
        COUNT(*) FILTER (
          WHERE c.opted_in = true
            AND c.opted_out = false
@@ -57,7 +66,8 @@ const getRecipientCounts = async () => {
     count: parseInt(row.eligible, 10),
     byMethod: {
       sms: parseInt(row.sms, 10),
-      web: parseInt(row.web, 10)
+      web: parseInt(row.web, 10),
+      legacy: parseInt(row.legacy, 10)
     },
     excludedImported: parseInt(row.excluded_imported, 10)
   };
