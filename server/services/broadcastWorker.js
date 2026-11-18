@@ -31,6 +31,14 @@ const PERMANENT_ERROR_CODES = new Set([
 let running = false;
 let timer = null;
 
+// The number a broadcast is sent from. DJ broadcasts must carry their own
+// from_number (stamped at confirm); listener broadcasts from before
+// migration 007 have none and use TWILIO_PHONE_NUMBER as they always did.
+const fromNumberFor = (broadcast) => {
+  if (broadcast.audience === 'djs') return broadcast.from_number || null;
+  return broadcast.from_number || process.env.TWILIO_PHONE_NUMBER;
+};
+
 const isMessagingEnabled = async () => {
   const { rows } = await pool.query(
     "SELECT value FROM settings WHERE key = 'messaging_enabled'"
@@ -57,10 +65,14 @@ const handleSendError = async (broadcast, recipient, error) => {
 
   if (code === 21610) {
     // Twilio's Advanced Opt-Out can intercept a STOP before it ever reaches
-    // /webhook/sms, so contacts.opted_out can drift out of sync with what
-    // Twilio already knows. Self-heal on discovery so future sends skip them.
+    // our webhook, so the local opted_out flag can drift out of sync with
+    // what Twilio already knows. Self-heal on discovery so future sends skip
+    // them. Opt-out is per number AND per line: a DJ who opted out of the DJ
+    // line is still a listener contact, and vice versa, so only the table
+    // for this broadcast's audience is touched.
+    const table = broadcast.audience === 'djs' ? 'dj_roster' : 'contacts';
     await pool.query(
-      `UPDATE contacts
+      `UPDATE ${table}
        SET opted_out = true, opted_out_timestamp = COALESCE(opted_out_timestamp, NOW())
        WHERE phone_number = $1`,
       [recipient.phone_number]
@@ -145,10 +157,19 @@ const sendNextRecipient = async (broadcast) => {
     return;
   }
 
+  const from = fromNumberFor(broadcast);
+  if (!from) {
+    // A DJ broadcast with no stamped number. Never fall back to the listener
+    // number; fail the row so the status page shows it.
+    await markFailed(broadcast.id, recipient.id, 'no_from_number', 'No DJ sending number on this broadcast');
+    return;
+  }
+
   try {
     const result = await twilioService.sendSMS(
       recipient.phone_number,
-      fullTextFor(broadcast.body)
+      fullTextFor(broadcast.body, broadcast.audience),
+      { from }
     );
     await pool.query(
       `UPDATE broadcast_recipients
@@ -175,7 +196,8 @@ const sendNextRecipient = async (broadcast) => {
  */
 const resumeInterruptedBroadcasts = async () => {
   const { rows: stuck } = await pool.query(
-    `SELECT r.*, b.body, b.started_at, b.status AS broadcast_status
+    `SELECT r.*, b.body, b.started_at, b.status AS broadcast_status,
+            b.audience, b.from_number
      FROM broadcast_recipients r
      JOIN broadcasts b ON b.id = r.broadcast_id
      WHERE r.status = 'sending'
@@ -187,10 +209,16 @@ const resumeInterruptedBroadcasts = async () => {
 
   for (const row of stuck) {
     try {
-      const expected = fullTextFor(row.body);
+      const from = fromNumberFor(row);
+      if (!from) {
+        throw new Error('DJ broadcast has no from_number; cannot check what Twilio sent');
+      }
+      const expected = fullTextFor(row.body, row.audience);
       const recent = await twilioService.listMessagesTo(
         row.phone_number,
-        row.started_at || row.claimed_at
+        row.started_at || row.claimed_at,
+        20,
+        { from }
       );
       const alreadySent = recent.find((m) => m.body === expected);
 
@@ -242,14 +270,18 @@ const resumeInterruptedBroadcasts = async () => {
 const tick = async () => {
   try {
     const { rows: [broadcast] } = await pool.query(
-      "SELECT * FROM broadcasts WHERE status = 'sending' ORDER BY started_at LIMIT 1"
+      // Oldest sending broadcast first, across both audiences: there is one
+      // worker and one text per tick, so a DJ notice may wait behind a
+      // listener broadcast that started earlier.
+      "SELECT * FROM broadcasts WHERE status = 'sending' ORDER BY started_at, id LIMIT 1"
     );
 
     if (broadcast && (await isMessagingEnabled())) {
       await sendNextRecipient(broadcast);
     }
     // If messaging is globally disabled the broadcast simply pauses here and
-    // resumes when staff flip the toggle back on — see spec §11.
+    // resumes when staff flip the toggle back on — see spec §11. This kill
+    // switch pauses DJ broadcasts too.
   } catch (err) {
     console.error('[broadcast-worker] tick error:', err.message);
   } finally {
@@ -277,8 +309,11 @@ const stop = () => {
 module.exports = {
   start,
   stop,
+  isMessagingEnabled,
   // exported for tests
+  tick,
   resumeInterruptedBroadcasts,
   sendNextRecipient,
+  fromNumberFor,
   PERMANENT_ERROR_CODES
 };

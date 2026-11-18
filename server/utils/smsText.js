@@ -66,8 +66,19 @@ const measure = (fullText) => {
   };
 };
 
-/** The exact text that goes on the wire for a broadcast body. */
-const fullTextFor = (body) => `${(body || '').trim()}${COMPLIANCE_SUFFIX}`;
+// Every text to the DJ group (broadcasts and staff replies from Slack) opens
+// with this, so a DJ can always tell a station notice from a personal text.
+const DJ_PREFIX = 'WYXR DJs: ';
+
+/**
+ * The exact text that goes on the wire for a broadcast body. DJ texts get
+ * DJ_PREFIX in front; both audiences get the STOP suffix. The compose page,
+ * test send, worker and crash recovery all call this, so they always agree.
+ */
+const fullTextFor = (body, audience = 'listeners') => {
+  const prefix = audience === 'djs' ? DJ_PREFIX : '';
+  return `${prefix}${(body || '').trim()}${COMPLIANCE_SUFFIX}`;
+};
 
 // Public URL shorteners draw carrier filtering because they hide the
 // destination. Not blocked — surfaced as a compose-page warning (spec §9.1).
@@ -89,6 +100,7 @@ const findShorteners = (text) => {
 
 module.exports = {
   COMPLIANCE_SUFFIX,
+  DJ_PREFIX,
   measure,
   fullTextFor,
   findShorteners,

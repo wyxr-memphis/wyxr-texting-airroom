@@ -19,9 +19,11 @@ function makeWsToken(sessionId) {
 router.post('/login', ...loginLimiters, (req, res) => {
   const { username, password } = req.body;
 
-  if (verifyCredentials(username, password)) {
+  const role = verifyCredentials(username, password);
+  if (role) {
     req.session.authenticated = true;
     req.session.username = username;
+    req.session.role = role;
     return res.json({ success: true, username, wsToken: makeWsToken(req.session.id) });
   }
 

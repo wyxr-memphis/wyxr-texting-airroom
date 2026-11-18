@@ -29,6 +29,10 @@ cd client
 npm install
 npm start                      # React dev server at localhost:3000
 
+# Tests (server; dry-run Twilio/Slack, local *_test DB only)
+createdb wyxr_texts_dj_test    # once
+cd server && npm test
+
 # Database setup (first time only)
 createdb wyxr_texts
 psql wyxr_texts < server/db/schema.sql
@@ -248,6 +252,7 @@ Render free tier spins down after 15min idle. First request takes 50+ seconds. F
 - `ARCHITECTURE.md` - Detailed system architecture with diagrams
 - `DEPLOYMENT_STATUS.md` - Current deployment status and checklist
 - `FEATURE_REQUESTS.md` - Future enhancements (A2P reply, voice messages)
+- `DJ_TEXTING.md` - DJ texting group: second Twilio number, staff login, DJ roster, Slack reply relay
 
 ## Deployment
 

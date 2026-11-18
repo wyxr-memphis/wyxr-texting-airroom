@@ -265,4 +265,58 @@ router.post('/sms', express.urlencoded({ extended: false }), validateTwilioReque
   }
 });
 
+// ---------------------------------------------------------------------------
+// POST /webhook/dj-sms - inbound texts to the DJ line (DJ_TWILIO_PHONE_NUMBER).
+//
+// Separate from /sms above: nothing here touches messages or contacts or
+// emits message:new. Signature validation uses DJ_TWILIO_WEBHOOK_URL (the
+// exact public URL of this route) and is read per request. In production a
+// missing DJ_TWILIO_WEBHOOK_URL rejects every request rather than running
+// unvalidated. See services/djInbound.js for the keyword rules.
+// ---------------------------------------------------------------------------
+const djInbound = require('../services/djInbound');
+const { runAfterResponse } = require('../utils/afterResponse');
+
+const validateDjTwilioRequest = (req, res, next) => {
+  if (process.env.NODE_ENV !== 'production') return next();
+  const url = process.env.DJ_TWILIO_WEBHOOK_URL;
+  if (!url) {
+    console.error('DJ webhook rejected: DJ_TWILIO_WEBHOOK_URL is not set');
+    return res.status(403).type('text/plain').send('DJ webhook URL not configured');
+  }
+  const ok = twilio.validateRequest(
+    process.env.TWILIO_AUTH_TOKEN,
+    req.get('X-Twilio-Signature') || '',
+    url,
+    req.body || {}
+  );
+  if (!ok) {
+    console.warn('DJ webhook rejected: bad Twilio signature');
+    return res.status(403).type('text/plain').send('Twilio Request Validation Failed.');
+  }
+  return next();
+};
+
+router.post('/dj-sms', express.urlencoded({ extended: false }), validateDjTwilioRequest, async (req, res) => {
+  const { From, Body } = req.body;
+  res.type('text/xml');
+
+  if (typeof From !== 'string' || !/^\+\d{8,15}$/.test(From) || typeof Body !== 'string') {
+    console.warn('DJ webhook rejected: malformed From/Body', { from: From });
+    return res.send('<Response></Response>');
+  }
+
+  let outcome = {};
+  try {
+    outcome = await djInbound.handleInbound(From, Body);
+  } catch (error) {
+    console.error('Error processing DJ-line SMS:', error);
+  }
+  res.send('<Response></Response>');
+
+  if (outcome.afterResponse) {
+    runAfterResponse('dj-sms slack post', outcome.afterResponse);
+  }
+});
+
 module.exports = router;
