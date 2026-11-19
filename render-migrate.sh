@@ -5,12 +5,12 @@ echo "============================"
 echo ""
 echo "This will run the database schema on your Render PostgreSQL database."
 echo ""
-echo "You need the Internal Database URL from Render:"
-echo "  1. Go to Render → Your PostgreSQL database"
-echo "  2. Find 'Internal Database URL' (NOT External)"
-echo "  3. Copy the full URL (postgresql://...)"
+echo "You need the External Database URL from Render:"
+echo "  1. Go to Render → Your PostgreSQL database → Connect"
+echo "  2. Open the 'External' tab (the Internal URL only works inside Render)"
+echo "  3. Copy the full URL (postgresql://...render.com/...)"
 echo ""
-read -p "Paste Internal Database URL here: " DATABASE_URL
+read -p "Paste External Database URL here: " DATABASE_URL
 echo ""
 
 if [ -z "$DATABASE_URL" ]; then
