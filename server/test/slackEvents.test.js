@@ -114,6 +114,15 @@ describe('staff reply -> text', () => {
     assert.equal(await h.count('SELECT COUNT(*) FROM dj_outbound_replies'), 1);
   });
 
+  test('a thread reply also sent to the channel (thread_broadcast) is texted', async () => {
+    await h.slackPost(staffReply({ subtype: 'thread_broadcast', text: 'Thanks for taking the survey!' }));
+    assert.deepEqual(sent(), [{
+      to: dj.phone_number,
+      from: h.DJ_NUMBER,
+      body: 'WYXR DJs: Thanks for taking the survey! Reply STOP to opt out.'
+    }]);
+  });
+
   const ignoredCases = {
     'bot message (bot_id)': { bot_id: 'BFAKE' },
     'bot message (subtype)': { subtype: 'bot_message' },

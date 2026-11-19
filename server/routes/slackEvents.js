@@ -41,7 +41,10 @@ const skipReason = async (dj) => {
 const handleEvent = async (event) => {
   if (!event || event.type !== 'message') return { ignored: 'not a message' };
   if (event.channel !== slack.channelId()) return { ignored: 'other channel' };
-  if (event.subtype) return { ignored: `subtype ${event.subtype}` }; // edits, deletes, joins, bot posts
+  // Edits, deletes, joins and bot posts all carry a subtype. A thread reply
+  // with "Also send to #channel" ticked arrives as subtype thread_broadcast;
+  // that is still a staff reply, so it is the one subtype we act on.
+  if (event.subtype && event.subtype !== 'thread_broadcast') return { ignored: `subtype ${event.subtype}` };
   if (event.bot_id) return { ignored: 'bot message' };
   if (!event.thread_ts || event.thread_ts === event.ts) return { ignored: 'not a thread reply' };
 
@@ -149,7 +152,16 @@ router.post('/events', express.raw({ type: 'application/json', limit: '1mb' }), 
   // handle the event.
   res.status(200).end();
   if (payload.type === 'event_callback') {
-    runAfterResponse('slack event', () => handleEvent(payload.event));
+    runAfterResponse('slack event', async () => {
+      const outcome = await handleEvent(payload.event);
+      // One line per event (no message text), so a reply that didn't go out
+      // can be traced in the Render logs.
+      const e = payload.event || {};
+      console.log(
+        `[slack-events] ${e.type || 'unknown'}${e.subtype ? '/' + e.subtype : ''} ts=${e.ts || '-'}: `
+        + (outcome.ignored ? `ignored (${outcome.ignored})` : `${outcome.status}${outcome.reason ? ' (' + outcome.reason + ')' : ''}`)
+      );
+    });
   }
 });
 
