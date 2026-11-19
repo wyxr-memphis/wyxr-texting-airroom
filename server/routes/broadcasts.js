@@ -951,7 +951,7 @@ router.get('/broadcasts/:id', requireAuthAdmin, async (req, res) => {
   <div class="panel">
     <h2>Message</h2>
     ${isDj ? '<p class="dj-banner">DJs only. Not sent to listeners.</p>' : ''}
-    <p style="line-height:1.6;">${escapeHtml(fullTextFor(broadcast.body, broadcast.audience))}</p>
+    <p style="line-height:1.6; white-space:pre-wrap;">${escapeHtml(fullTextFor(broadcast.body, broadcast.audience))}</p>
     <p class="muted" style="margin-top:12px;">
       ${broadcast.character_count} characters &middot; ${broadcast.segment_count} segment(s)
       &middot; ${escapeHtml(broadcast.encoding || '')}

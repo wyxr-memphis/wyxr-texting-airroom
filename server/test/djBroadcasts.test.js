@@ -90,7 +90,7 @@ describe('DJ broadcast end to end (dry run)', () => {
     await h.addListener(h.fake(133));
 
     const id = await djDraft();
-    const expected = 'WYXR DJs: Studio A board is down Thursday 2-4pm. Reply STOP to opt out.';
+    const expected = 'WYXR DJs:\nStudio A board is down Thursday 2-4pm.\n\nReply STOP to opt out.';
 
     let res = await staff.post(`/admin/broadcasts/${id}/test-send`, { json: { phone: '901-555-0199' } });
     assert.equal(res.status, 200);
@@ -125,7 +125,7 @@ describe('DJ broadcast end to end (dry run)', () => {
   test('the segment count includes the DJ prefix and STOP suffix', async () => {
     const id = await djDraft('x'.repeat(120)); // 120 + 10 prefix + 23 suffix = 153 -> 1 segment
     let { rows: [b] } = await h.pool.query('SELECT character_count, segment_count FROM broadcasts WHERE id = $1', [id]);
-    assert.equal(b.character_count, 120 + 'WYXR DJs: '.length + ' Reply STOP to opt out.'.length);
+    assert.equal(b.character_count, 120 + 'WYXR DJs:\n'.length + '\n\nReply STOP to opt out.'.length);
     const id2 = await djDraft('x'.repeat(130)); // 163 -> 2 segments
     ({ rows: [b] } = await h.pool.query('SELECT segment_count FROM broadcasts WHERE id = $1', [id2]));
     assert.equal(b.segment_count, 2);
@@ -256,7 +256,7 @@ describe('worker', () => {
     assert.deepEqual(sends, [
       { to: h.fake(160), from: h.LISTENER_NUMBER, body: 'listener Reply STOP to opt out.' },
       { to: h.fake(161), from: h.LISTENER_NUMBER, body: 'listener Reply STOP to opt out.' },
-      { to: h.fake(162), from: h.DJ_NUMBER, body: 'WYXR DJs: dj Reply STOP to opt out.' }
+      { to: h.fake(162), from: h.DJ_NUMBER, body: 'WYXR DJs:\ndj\n\nReply STOP to opt out.' }
     ]);
   });
 

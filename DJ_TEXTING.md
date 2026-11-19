@@ -35,7 +35,7 @@ asks the DJ by text right after they reply YES (at most 3 times).
 | Page | What it does |
 |---|---|
 | `/admin/djs` | Roster (first name, last name, show, phone, status badge, "Needs name" badge), add/edit/remove, the "Text DJ to …" instruction, latest 50 DJ replies and staff answers with mark-read |
-| `/admin/djs/message` | DJ-only compose page: live count, test send, confirm. Every text starts with `WYXR DJs: ` and ends with ` Reply STOP to opt out.` |
+| `/admin/djs/message` | DJ-only compose page: live count, test send, confirm. Every text is laid out as `WYXR DJs:` on the first line, the message on its own line, then a blank line and `Reply STOP to opt out.` |
 | `/admin/broadcasts/:id` | Shared status page (shows "DJs only" for DJ broadcasts) |
 
 Remove sets `active = false`; rows are never deleted. Re-adding a removed DJ's
@@ -130,7 +130,7 @@ still saved and listed on `/admin/djs`, and the page shows a notice.
   channel is acted on. Edits, deletes, joins, bot posts, top-level posts and
   other channels are ignored. Slack retries are deduplicated by the event's
   `ts`. The reply is converted to plain text (links become `label (url)`,
-  mentions are dropped), sent with the `WYXR DJs: ` prefix and STOP suffix,
+  mentions are dropped), sent in the same layout as broadcasts (`WYXR DJs:` line, message, STOP line),
   and gets a :white_check_mark: when sent.
 - **Not sent** (the app says why in the thread): over 3 segments, DJ line
   off, messaging kill switch off, DJ removed, not signed up, or opted out.

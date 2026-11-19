@@ -96,7 +96,7 @@ describe('staff reply -> text', () => {
     assert.deepEqual(sent(), [{
       to: dj.phone_number,
       from: h.DJ_NUMBER,
-      body: 'WYXR DJs: Use the schedule (https://wyxr.org/schedule) & ask Reply STOP to opt out.'
+      body: 'WYXR DJs:\nUse the schedule (https://wyxr.org/schedule) & ask\n\nReply STOP to opt out.'
     }]);
     assert.deepEqual(await replies(), [{ status: 'sent', error: null, has_sid: true }]);
     assert.deepEqual(slackCalls(), [{
@@ -119,7 +119,7 @@ describe('staff reply -> text', () => {
     assert.deepEqual(sent(), [{
       to: dj.phone_number,
       from: h.DJ_NUMBER,
-      body: 'WYXR DJs: Thanks for taking the survey! Reply STOP to opt out.'
+      body: 'WYXR DJs:\nThanks for taking the survey!\n\nReply STOP to opt out.'
     }]);
   });
 
@@ -212,7 +212,7 @@ describe('end to end: DJ reply -> Slack thread -> staff answer -> text', () => {
     assert.deepEqual(sent(), [{
       to: dj2.phone_number,
       from: h.DJ_NUMBER,
-      body: 'WYXR DJs: Yes, fixed this morning. Reply STOP to opt out.'
+      body: 'WYXR DJs:\nYes, fixed this morning.\n\nReply STOP to opt out.'
     }]);
   });
 

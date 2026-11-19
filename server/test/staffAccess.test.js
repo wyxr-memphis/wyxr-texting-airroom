@@ -256,7 +256,7 @@ describe('HTML escaping on the new pages', () => {
     const draft = await staff.post('/admin/djs/broadcasts', { json: { body: evil } });
     res = await staff.get(`/admin/broadcasts/${draft.data.id}`);
     assert.doesNotMatch(res.text, /<script>alert\(1\)<\/script>/);
-    assert.match(res.text, /WYXR DJs: &lt;script&gt;/);
+    assert.match(res.text, /WYXR DJs:\n&lt;script&gt;/);
 
     res = await staff.get('/admin/djs/message');
     assert.equal(res.status, 200);

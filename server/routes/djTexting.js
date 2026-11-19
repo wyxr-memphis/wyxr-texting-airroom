@@ -14,7 +14,7 @@ const pool = require('../config/database');
 const { requireStaff, requireStaffAdmin } = require('../middleware/auth');
 const { escapeHtml } = require('../utils/html');
 const { normalizePhone } = require('../utils/phone');
-const { COMPLIANCE_SUFFIX, DJ_PREFIX } = require('../utils/smsText');
+const { COMPLIANCE_SUFFIX, DJ_PREFIX, DJ_SUFFIX } = require('../utils/smsText');
 const { getRecipientCounts } = require('../services/broadcastAudience');
 const twilioService = require('../services/twilio');
 const slack = require('../services/slack');
@@ -463,8 +463,8 @@ router.get('/djs/message', requireStaffAdmin, async (req, res) => {
     <label for="body">What do you want to tell the DJs?</label>
     <textarea id="body" placeholder="Studio A board is down Thursday 2-4pm. Please use Studio B."></textarea>
     <div class="counter" id="counter">0 characters &middot; 0 segments</div>
-    <div class="suffix-note">Added automatically: &ldquo;${escapeHtml(DJ_PREFIX.trim())}&rdquo; at the start and &ldquo;${escapeHtml(COMPLIANCE_SUFFIX.trim())}&rdquo; at the end. Both count toward the length.</div>
-    <div class="suffix-note" id="preview" style="font-style:normal; color:#ccc;"></div>
+    <div class="suffix-note">Added automatically: &ldquo;${escapeHtml(DJ_PREFIX.trim())}&rdquo; on the first line and &ldquo;${escapeHtml(COMPLIANCE_SUFFIX.trim())}&rdquo; on the last, with your message on its own lines in between. Both count toward the length.</div>
+    <div class="suffix-note" id="preview" style="font-style:normal; color:#ccc; white-space:pre-wrap;"></div>
     <div class="warn" id="shortener-warn" style="display:none;"></div>
   </div>
 
@@ -488,7 +488,7 @@ router.get('/djs/message', requireStaffAdmin, async (req, res) => {
     const script = `
   const MAX_CHARACTERS = ${MAX_CHARACTERS};
   const PREFIX = ${jsonForScript(DJ_PREFIX)};
-  const SUFFIX = ${jsonForScript(COMPLIANCE_SUFFIX)};
+  const SUFFIX = ${jsonForScript(DJ_SUFFIX)};
   const SHORTENERS = ${jsonForScript(require('../utils/smsText').SHORTENER_DOMAINS)};
   let draftId = null;
   let liveCount = ${counts.count};
@@ -507,7 +507,7 @@ ${CLIENT_MEASURE_JS}
       + m.segments + ' segment' + (m.segments === 1 ? '' : 's') + ' (' + m.encoding + ')';
     const nextBoundary = m.segments <= 1 ? m.single : m.segments * 153;
     counterEl.className = 'counter' + (m.len > nextBoundary - 20 ? ' near-limit' : '');
-    previewEl.textContent = 'DJs will see: ' + full;
+    previewEl.textContent = 'DJs will see:\\n\\n' + full;
     const hits = SHORTENERS.filter(d => bodyEl.value.toLowerCase().includes(d));
     warnEl.style.display = hits.length ? 'block' : 'none';
     warnEl.textContent = hits.length ? 'Shortened links (' + hits.join(', ') + ') are a common cause of carrier filtering.' : '';

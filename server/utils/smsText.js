@@ -68,16 +68,28 @@ const measure = (fullText) => {
 
 // Every text to the DJ group (broadcasts and staff replies from Slack) opens
 // with this, so a DJ can always tell a station notice from a personal text.
-const DJ_PREFIX = 'WYXR DJs: ';
+// DJ texts put the message on its own lines so it doesn't get lost between
+// the label and the STOP line:
+//
+//   WYXR DJs:
+//   See you Thursday
+//
+//   Reply STOP to opt out.
+//
+// Line breaks are GSM-7 and cost one character each.
+const DJ_PREFIX = 'WYXR DJs:\n';
+const DJ_SUFFIX = '\n\n' + COMPLIANCE_SUFFIX.trim();
 
 /**
  * The exact text that goes on the wire for a broadcast body. DJ texts get
- * DJ_PREFIX in front; both audiences get the STOP suffix. The compose page,
+ * DJ_PREFIX in front and DJ_SUFFIX after; listener texts get the one-line
+ * COMPLIANCE_SUFFIX (unchanged). The compose page,
  * test send, worker and crash recovery all call this, so they always agree.
  */
 const fullTextFor = (body, audience = 'listeners') => {
-  const prefix = audience === 'djs' ? DJ_PREFIX : '';
-  return `${prefix}${(body || '').trim()}${COMPLIANCE_SUFFIX}`;
+  const trimmed = (body || '').trim();
+  if (audience === 'djs') return `${DJ_PREFIX}${trimmed}${DJ_SUFFIX}`;
+  return `${trimmed}${COMPLIANCE_SUFFIX}`;
 };
 
 // Public URL shorteners draw carrier filtering because they hide the
@@ -101,6 +113,7 @@ const findShorteners = (text) => {
 module.exports = {
   COMPLIANCE_SUFFIX,
   DJ_PREFIX,
+  DJ_SUFFIX,
   measure,
   fullTextFor,
   findShorteners,
