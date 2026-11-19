@@ -1,17 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { requireAuth, requireAuthAdmin } = require('../middleware/auth');
+const { requireAuth, requireAuthAdmin, isStaff } = require('../middleware/auth');
 const { verifyCredentials } = require('../utils/credentials');
 const { loginLimiters } = require('../middleware/loginLimiter');
 const { escapeHtml } = require('../utils/html');
 
 // GET /admin/login - Login form for admin panel
 router.get('/login', (req, res) => {
-  if (req.session && req.session.authenticated) {
+  // ?staff=1 comes from requireStaffAdmin: a signed-in shared-login session
+  // tried to open a staff page, so show the form instead of bouncing back.
+  const wantsStaff = req.query.staff === '1';
+  if (req.session && req.session.authenticated && !(wantsStaff && !isStaff(req))) {
     return res.redirect('/admin/messages');
   }
-  const error = req.query.error ? '<p style="color:#E9407A;margin-bottom:16px;">Invalid username or password.</p>' : '';
+  const error = req.query.error
+    ? '<p style="color:#E9407A;margin-bottom:16px;">Invalid username or password.</p>'
+    : wantsStaff
+      ? '<p style="color:#FFC629;margin-bottom:16px;">That page needs the staff login.</p>'
+      : '';
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,10 +58,12 @@ router.get('/login', (req, res) => {
 // POST /admin/login - Authenticate and redirect
 router.post('/login', ...loginLimiters, (req, res) => {
   const { username, password } = req.body;
-  if (verifyCredentials(username, password)) {
+  const role = verifyCredentials(username, password);
+  if (role) {
     req.session.authenticated = true;
     req.session.username = username;
-    return res.redirect('/admin/messages');
+    req.session.role = role;
+    return res.redirect(role === 'staff' ? '/admin/djs' : '/admin/messages');
   }
   console.warn(`Failed login attempt on /admin/login from IP ${req.ip}`);
   return res.redirect('/admin/login?error=1');

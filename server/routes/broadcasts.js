@@ -6,10 +6,16 @@
 // these pages carries an Origin header, but curl testing needs -H "Origin: ...".
 //
 // See BROADCAST_MESSAGING_SPEC.md §6 and §9.
+//
+// Two audiences share these routes (migration 007): 'listeners' (contacts,
+// sent from TWILIO_PHONE_NUMBER) and 'djs' (dj_roster, sent from
+// DJ_TWILIO_PHONE_NUMBER). DJ drafts are created from routes/djTexting.js;
+// every route below that loads a 'djs' row answers 404 unless the session is
+// staff, so the shared login can't see or touch DJ broadcasts.
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { requireAuth, requireAuthAdmin } = require('../middleware/auth');
+const { requireAuth, requireAuthAdmin, isStaff, sessionRole } = require('../middleware/auth');
 const { escapeHtml } = require('../utils/html');
 const { normalizePhone } = require('../utils/phone');
 const twilioService = require('../services/twilio');
@@ -20,6 +26,7 @@ const reconsent = require('../services/reconsent');
 const MAX_CHARACTERS = parseInt(process.env.BROADCAST_MAX_CHARACTERS || '1200', 10);
 const MAX_RECIPIENTS = parseInt(process.env.BROADCAST_MAX_RECIPIENTS || '2000', 10);
 const MIN_INTERVAL_MINUTES = parseInt(process.env.BROADCAST_MIN_INTERVAL_MINUTES || '30', 10);
+const DJ_MIN_INTERVAL_MINUTES = parseInt(process.env.DJ_BROADCAST_MIN_INTERVAL_MINUTES || '2', 10);
 const SEND_INTERVAL_MS = parseInt(process.env.BROADCAST_SEND_INTERVAL_MS || '1100', 10);
 
 // Tolerance for the confirm-time count check. The list can legitimately shift
@@ -28,7 +35,32 @@ const SEND_INTERVAL_MS = parseInt(process.env.BROADCAST_SEND_INTERVAL_MS || '110
 // staff should look again before sending.
 const COUNT_DRIFT_TOLERANCE = 5;
 
-const measureBody = (body) => measure(fullTextFor(body));
+const measureBody = (body, audience = 'listeners') => measure(fullTextFor(body, audience));
+
+const cooldownMinutesFor = (audience) =>
+  audience === 'djs' ? DJ_MIN_INTERVAL_MINUTES : MIN_INTERVAL_MINUTES;
+
+/**
+ * Number a broadcast's texts go out from. For DJs this is null when
+ * DJ_TWILIO_PHONE_NUMBER is unset, which turns DJ sending off; it never falls
+ * back to the listener number.
+ */
+const fromNumberForAudience = (audience) =>
+  audience === 'djs' ? twilioService.djFromNumber() : process.env.TWILIO_PHONE_NUMBER;
+
+const DJ_SENDING_OFF = 'DJ sending is off: DJ_TWILIO_PHONE_NUMBER is not set.';
+
+// A 'djs' broadcast is invisible to a non-staff session: same 404 as a
+// missing id, so the shared login can't even confirm one exists.
+const visibleTo = (req, row) => Boolean(row) && (row.audience !== 'djs' || isStaff(req));
+
+const loadVisibleBroadcast = async (req, id, db = pool, forUpdate = false) => {
+  const { rows: [row] } = await db.query(
+    `SELECT * FROM broadcasts WHERE id = $1${forUpdate ? ' FOR UPDATE' : ''}`,
+    [id]
+  );
+  return visibleTo(req, row) ? row : null;
+};
 
 const ERROR_LABELS = {
   21610: 'Opted out at carrier level',
@@ -46,7 +78,8 @@ const errorLabel = (code) => ERROR_LABELS[parseInt(code, 10)] || 'Delivery error
 // JSON endpoints
 // ---------------------------------------------------------------------------
 
-// GET /admin/broadcasts/recipient-count
+// GET /admin/broadcasts/recipient-count (listeners; the DJ count lives at
+// /admin/djs/recipient-count behind the staff login)
 router.get('/broadcasts/recipient-count', requireAuth, async (req, res) => {
   try {
     res.json(await getRecipientCounts());
@@ -85,11 +118,11 @@ router.post('/contacts/request-reconsent', requireAuth, async (req, res) => {
   }
 });
 
-const validateBody = (body) => {
+const validateBody = (body, audience = 'listeners') => {
   if (typeof body !== 'string' || body.trim().length === 0) {
     return 'Message body is required';
   }
-  const measured = measureBody(body);
+  const measured = measureBody(body, audience);
   if (measured.characterCount > MAX_CHARACTERS) {
     return `Message is too long (${measured.characterCount} characters, max ${MAX_CHARACTERS})`;
   }
@@ -98,8 +131,9 @@ const validateBody = (body) => {
 
 const broadcastPayload = (row) => ({
   id: row.id,
+  audience: row.audience,
   body: row.body,
-  fullText: fullTextFor(row.body),
+  fullText: fullTextFor(row.body, row.audience),
   characterCount: row.character_count,
   segmentCount: row.segment_count,
   encoding: row.encoding,
@@ -107,24 +141,28 @@ const broadcastPayload = (row) => ({
   shortenerWarnings: findShorteners(row.body)
 });
 
-// POST /admin/broadcasts - create a draft
-router.post('/broadcasts', requireAuth, async (req, res) => {
+/**
+ * Create-draft handler for an audience. Listener drafts are created here;
+ * routes/djTexting.js mounts createDraftHandler('djs') behind requireStaff.
+ */
+const createDraftHandler = (audience) => async (req, res) => {
   const { body } = req.body;
-  const invalid = validateBody(body);
+  const invalid = validateBody(body, audience);
   if (invalid) return res.status(400).json({ error: invalid });
 
   try {
-    const measured = measureBody(body);
+    const measured = measureBody(body, audience);
     const { rows: [row] } = await pool.query(
-      `INSERT INTO broadcasts (body, character_count, segment_count, encoding, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO broadcasts (body, character_count, segment_count, encoding, created_by, audience)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         body.trim(),
         measured.characterCount,
         measured.segmentCount,
         measured.encoding,
-        req.session.username || null
+        req.session.username || null,
+        audience
       ]
     );
     res.json(broadcastPayload(row));
@@ -132,16 +170,23 @@ router.post('/broadcasts', requireAuth, async (req, res) => {
     console.error('Error creating broadcast:', error);
     res.status(500).json({ error: 'Failed to create broadcast' });
   }
-});
+};
+
+// POST /admin/broadcasts - create a listener draft
+router.post('/broadcasts', requireAuth, createDraftHandler('listeners'));
 
 // PATCH /admin/broadcasts/:id - edit a draft
 router.patch('/broadcasts/:id', requireAuth, async (req, res) => {
   const { body } = req.body;
-  const invalid = validateBody(body);
-  if (invalid) return res.status(400).json({ error: invalid });
 
   try {
-    const measured = measureBody(body);
+    const existingRow = await loadVisibleBroadcast(req, req.params.id);
+    if (!existingRow) return res.status(404).json({ error: 'Broadcast not found' });
+
+    const invalid = validateBody(body, existingRow.audience);
+    if (invalid) return res.status(400).json({ error: invalid });
+
+    const measured = measureBody(body, existingRow.audience);
     const { rows: [row] } = await pool.query(
       `UPDATE broadcasts
        SET body = $1, character_count = $2, segment_count = $3, encoding = $4
@@ -174,15 +219,15 @@ router.post('/broadcasts/:id/test-send', requireAuth, async (req, res) => {
   }
 
   try {
-    const { rows: [broadcast] } = await pool.query(
-      'SELECT * FROM broadcasts WHERE id = $1',
-      [req.params.id]
-    );
+    const broadcast = await loadVisibleBroadcast(req, req.params.id);
     if (!broadcast) return res.status(404).json({ success: false, error: 'Broadcast not found' });
+
+    const from = fromNumberForAudience(broadcast.audience);
+    if (!from) return res.status(409).json({ success: false, error: DJ_SENDING_OFF });
 
     // Deliberately bypasses broadcast_recipients and the opt-in check: this is
     // staff texting their own phone to proof the message before sending.
-    await twilioService.sendSMS(phone, fullTextFor(broadcast.body));
+    await twilioService.sendSMS(phone, fullTextFor(broadcast.body, broadcast.audience), { from });
 
     await pool.query(
       'UPDATE broadcasts SET last_test_sent_at = NOW(), last_test_phone = $1 WHERE id = $2',
@@ -204,10 +249,7 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const { rows: [broadcast] } = await client.query(
-      'SELECT * FROM broadcasts WHERE id = $1 FOR UPDATE',
-      [req.params.id]
-    );
+    const broadcast = await loadVisibleBroadcast(req, req.params.id, client, true);
 
     if (!broadcast) {
       await client.query('ROLLBACK');
@@ -218,9 +260,19 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'This broadcast has already been sent' });
     }
 
-    // One in flight at a time.
+    const { audience } = broadcast;
+    const fromNumber = fromNumberForAudience(audience);
+    if (!fromNumber) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: DJ_SENDING_OFF });
+    }
+
+    // One in flight at a time per audience (the unique index enforces the
+    // same). A listener send doesn't block a DJ notice or vice versa; the
+    // worker still sends them one text at a time, oldest first.
     const { rows: active } = await client.query(
-      "SELECT id FROM broadcasts WHERE status = 'sending' LIMIT 1"
+      "SELECT id FROM broadcasts WHERE status = 'sending' AND audience = $1 LIMIT 1",
+      [audience]
     );
     if (active.length > 0) {
       await client.query('ROLLBACK');
@@ -229,25 +281,27 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
       });
     }
 
-    // Cooldown since the last confirmed send.
+    // Cooldown since the last confirmed send to the same audience.
+    const cooldown = cooldownMinutesFor(audience);
     const { rows: [recent] } = await client.query(
       `SELECT confirmed_at,
               EXTRACT(EPOCH FROM (NOW() - confirmed_at)) / 60 AS minutes_ago
        FROM broadcasts
-       WHERE confirmed_at IS NOT NULL
+       WHERE confirmed_at IS NOT NULL AND audience = $1
        ORDER BY confirmed_at DESC
-       LIMIT 1`
+       LIMIT 1`,
+      [audience]
     );
-    if (recent && Number(recent.minutes_ago) < MIN_INTERVAL_MINUTES) {
+    if (recent && Number(recent.minutes_ago) < cooldown) {
       await client.query('ROLLBACK');
       return res.status(429).json({
         error: `A broadcast was sent ${Math.round(recent.minutes_ago)} minutes ago. `
-          + `Wait until the ${MIN_INTERVAL_MINUTES}-minute cooldown passes before sending another.`
+          + `Wait until the ${cooldown}-minute cooldown passes before sending another.`
       });
     }
 
     // Re-check the audience live rather than trusting the compose page.
-    const live = await getRecipientCounts();
+    const live = await getRecipientCounts(audience);
 
     if (live.count === 0) {
       await client.query('ROLLBACK');
@@ -270,7 +324,7 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
       });
     }
 
-    await snapshotRecipients(client, broadcast.id);
+    await snapshotRecipients(client, broadcast.id, audience);
 
     // The AND status='draft' is the atomic guard against two simultaneous
     // confirm clicks: whichever transaction commits first wins, and the
@@ -281,12 +335,13 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
            confirmed_at = NOW(),
            started_at = NOW(),
            created_by = COALESCE(created_by, $2),
+           from_number = $3,
            recipient_count = (
              SELECT COUNT(*) FROM broadcast_recipients WHERE broadcast_id = $1
            )
        WHERE id = $1 AND status = 'draft'
        RETURNING *`,
-      [broadcast.id, req.session.username || null]
+      [broadcast.id, req.session.username || null, fromNumber]
     );
 
     if (!updated) {
@@ -297,7 +352,7 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
     await client.query('COMMIT');
 
     console.log(
-      `[broadcast] ${req.session.username || 'unknown'} confirmed broadcast ${updated.id} `
+      `[broadcast] ${req.session.username || 'unknown'} confirmed ${audience} broadcast ${updated.id} `
       + `to ${updated.recipient_count} recipients`
     );
 
@@ -318,6 +373,9 @@ router.post('/broadcasts/:id/confirm', requireAuth, async (req, res) => {
 // GET /admin/broadcasts/:id/status - polled by the status page
 router.get('/broadcasts/:id/status', requireAuth, async (req, res) => {
   try {
+    if (!(await loadVisibleBroadcast(req, req.params.id))) {
+      return res.status(404).json({ error: 'Broadcast not found' });
+    }
     const { rows: [row] } = await pool.query(
       `SELECT b.*,
               COUNT(r.*) FILTER (WHERE r.status IN ('pending', 'sending')) AS pending_count
@@ -353,6 +411,9 @@ router.get('/broadcasts/:id/status', requireAuth, async (req, res) => {
 // POST /admin/broadcasts/:id/cancel
 router.post('/broadcasts/:id/cancel', requireAuth, async (req, res) => {
   try {
+    if (!(await loadVisibleBroadcast(req, req.params.id))) {
+      return res.status(404).json({ error: 'Broadcast not found' });
+    }
     const { rows: [canceled] } = await pool.query(
       `UPDATE broadcasts
        SET status = 'canceled', canceled_at = NOW(), canceled_by = $2
@@ -498,16 +559,23 @@ const SHARED_STYLES = `
     }
     .row { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
     .row > input { flex: 1; min-width: 200px; }
+    .status-djs { background: #E9407A; color: white; }
+    .dj-banner {
+      background: #E9407A; color: #fff; font-weight: 700; padding: 12px 16px;
+      border-radius: 6px; margin-bottom: 14px; font-size: 1.05rem;
+    }
 `;
 
-const navLinks = (active) => `
+// The DJs link only renders for staff sessions.
+const navLinks = (active, role = 'dj') => `
     <div class="nav-links">
       <a href="/admin/messages" class="nav-link${active === 'messages' ? ' active' : ''}">Messages</a>
       <a href="/admin/contacts" class="nav-link${active === 'contacts' ? ' active' : ''}">Contacts</a>
-      <a href="/admin/broadcasts" class="nav-link${active === 'broadcasts' ? ' active' : ''}">Broadcasts</a>
+      <a href="/admin/broadcasts" class="nav-link${active === 'broadcasts' ? ' active' : ''}">Broadcasts</a>${role === 'staff' ? `
+      <a href="/admin/djs" class="nav-link${active === 'djs' ? ' active' : ''}">DJs</a>` : ''}
     </div>`;
 
-const page = ({ title, heading, subtitle, active, body, script }) => `<!DOCTYPE html>
+const page = ({ title, heading, subtitle, active, body, script, role }) => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -519,7 +587,7 @@ const page = ({ title, heading, subtitle, active, body, script }) => `<!DOCTYPE 
   <div class="header">
     <h1>${escapeHtml(heading)}</h1>
     <p>${escapeHtml(subtitle)}</p>
-    ${navLinks(active)}
+    ${navLinks(active, role)}
   </div>
   ${body}
   <script>${script || ''}</script>
@@ -529,6 +597,27 @@ const page = ({ title, heading, subtitle, active, body, script }) => `<!DOCTYPE 
 // Safe JSON for embedding in an inline <script>: the </ split prevents a value
 // containing "</script>" from closing the tag early.
 const jsonForScript = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
+
+// Client-side segment counter shared by the listener and DJ compose pages.
+// Mirrors server/utils/smsText.js — the server recomputes authoritatively at
+// save time, this is just so staff see the boundary while typing.
+const CLIENT_MEASURE_JS = `
+  const GSM7_BASIC = ${jsonForScript(
+    '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?'
+    + '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
+  )};
+  const GSM7_EXT = ${jsonForScript('^{}\\[~]|€')};
+  const basic = new Set(GSM7_BASIC), ext = new Set(GSM7_EXT);
+
+  function measure(text) {
+    const chars = Array.from(text);
+    const gsm7 = chars.every(c => basic.has(c) || ext.has(c));
+    const len = gsm7 ? chars.reduce((n, c) => n + (ext.has(c) ? 2 : 1), 0) : text.length;
+    const single = gsm7 ? 160 : 70, multi = gsm7 ? 153 : 67;
+    const segments = len === 0 ? 0 : (len <= single ? 1 : Math.ceil(len / multi));
+    return { len, segments, encoding: gsm7 ? 'GSM-7' : 'UCS-2', single };
+  }
+`;
 
 // GET /admin/broadcasts/new - compose page. Declared before /broadcasts/:id so
 // "new" is never captured as an id.
@@ -635,23 +724,7 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
   const sendBtn = document.getElementById('send-btn');
   const sendError = document.getElementById('send-error');
 
-  const GSM7_BASIC = ${jsonForScript(
-    '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?'
-    + '¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà'
-  )};
-  const GSM7_EXT = ${jsonForScript('^{}\\[~]|€')};
-  const basic = new Set(GSM7_BASIC), ext = new Set(GSM7_EXT);
-
-  // Mirrors server/utils/smsText.js — the server recomputes authoritatively at
-  // save time, this is just so staff see the boundary while typing.
-  function measure(text) {
-    const chars = Array.from(text);
-    const gsm7 = chars.every(c => basic.has(c) || ext.has(c));
-    const len = gsm7 ? chars.reduce((n, c) => n + (ext.has(c) ? 2 : 1), 0) : text.length;
-    const single = gsm7 ? 160 : 70, multi = gsm7 ? 153 : 67;
-    const segments = len === 0 ? 0 : (len <= single ? 1 : Math.ceil(len / multi));
-    return { len, segments, encoding: gsm7 ? 'GSM-7' : 'UCS-2', single };
-  }
+${CLIENT_MEASURE_JS}
 
   function refreshCounter() {
     const full = bodyEl.value.trim() + SUFFIX;
@@ -783,6 +856,7 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
       heading: 'New Broadcast',
       subtitle: 'Send one message to every listener who opted in',
       active: 'broadcasts',
+      role: sessionRole(req),
       body,
       script
     }));
@@ -795,15 +869,22 @@ router.get('/broadcasts/new', requireAuthAdmin, async (req, res) => {
 // GET /admin/broadcasts - history
 router.get('/broadcasts', requireAuthAdmin, async (req, res) => {
   try {
+    // DJ broadcasts are hidden from the shared login; staff see both, with
+    // an audience column.
+    const staff = isStaff(req);
     const { rows } = await pool.query(
-      `SELECT * FROM broadcasts ORDER BY COALESCE(confirmed_at, created_at) DESC LIMIT 100`
+      `SELECT * FROM broadcasts
+       ${staff ? '' : "WHERE audience <> 'djs'"}
+       ORDER BY COALESCE(confirmed_at, created_at) DESC LIMIT 100`
     );
+    const cols = staff ? 7 : 6;
 
     const rowsHtml = rows.length === 0
-      ? '<tr><td colspan="6" class="muted">No broadcasts yet.</td></tr>'
+      ? `<tr><td colspan="${cols}" class="muted">No broadcasts yet.</td></tr>`
       : rows.map((b) => `
         <tr>
-          <td class="timestamp">${new Date(b.confirmed_at || b.created_at).toLocaleString()}</td>
+          <td class="timestamp">${new Date(b.confirmed_at || b.created_at).toLocaleString()}</td>${staff ? `
+          <td>${b.audience === 'djs' ? '<span class="status-badge status-djs">DJs</span>' : 'Listeners'}</td>` : ''}
           <td>${escapeHtml(b.body.length > 70 ? b.body.slice(0, 70) + '…' : b.body)}</td>
           <td><span class="status-badge status-${escapeHtml(b.status)}">${escapeHtml(b.status)}</span></td>
           <td>${b.recipient_count}</td>
@@ -818,7 +899,7 @@ router.get('/broadcasts', requireAuthAdmin, async (req, res) => {
   <div class="panel" style="padding:0; overflow:hidden;">
     <table>
       <thead>
-        <tr><th>When</th><th>Message</th><th>Status</th><th>Recipients</th><th>Delivery</th><th></th></tr>
+        <tr><th>When</th>${staff ? '<th>Audience</th>' : ''}<th>Message</th><th>Status</th><th>Recipients</th><th>Delivery</th><th></th></tr>
       </thead>
       <tbody>${rowsHtml}</tbody>
     </table>
@@ -829,6 +910,7 @@ router.get('/broadcasts', requireAuthAdmin, async (req, res) => {
       heading: 'Broadcasts',
       subtitle: 'Station announcements sent to the opted-in list',
       active: 'broadcasts',
+      role: sessionRole(req),
       body
     }));
   } catch (error) {
@@ -840,11 +922,9 @@ router.get('/broadcasts', requireAuthAdmin, async (req, res) => {
 // GET /admin/broadcasts/:id - status / progress page
 router.get('/broadcasts/:id', requireAuthAdmin, async (req, res) => {
   try {
-    const { rows: [broadcast] } = await pool.query(
-      'SELECT * FROM broadcasts WHERE id = $1',
-      [req.params.id]
-    );
+    const broadcast = await loadVisibleBroadcast(req, req.params.id);
     if (!broadcast) return res.status(404).send('Broadcast not found');
+    const isDj = broadcast.audience === 'djs';
 
     const { rows: failures } = await pool.query(
       `SELECT error_code, COUNT(*) AS count
@@ -875,11 +955,13 @@ router.get('/broadcasts/:id', requireAuthAdmin, async (req, res) => {
     const body = `
   <div class="panel">
     <h2>Message</h2>
-    <p style="line-height:1.6;">${escapeHtml(fullTextFor(broadcast.body))}</p>
+    ${isDj ? '<p class="dj-banner">DJs only. Not sent to listeners.</p>' : ''}
+    <p style="line-height:1.6;">${escapeHtml(fullTextFor(broadcast.body, broadcast.audience))}</p>
     <p class="muted" style="margin-top:12px;">
       ${broadcast.character_count} characters &middot; ${broadcast.segment_count} segment(s)
       &middot; ${escapeHtml(broadcast.encoding || '')}
       ${broadcast.created_by ? ' &middot; created by ' + escapeHtml(broadcast.created_by) : ''}
+      ${broadcast.from_number ? ' &middot; from ' + escapeHtml(broadcast.from_number) : ''}
     </p>
   </div>
 
@@ -964,8 +1046,9 @@ router.get('/broadcasts/:id', requireAuthAdmin, async (req, res) => {
     res.send(page({
       title: `Broadcast #${broadcast.id} - WYXR Admin`,
       heading: `Broadcast #${broadcast.id}`,
-      subtitle: 'Delivery progress',
-      active: 'broadcasts',
+      subtitle: isDj ? 'DJ broadcast: delivery progress' : 'Delivery progress',
+      active: isDj ? 'djs' : 'broadcasts',
+      role: sessionRole(req),
       body,
       script
     }));
@@ -976,3 +1059,13 @@ router.get('/broadcasts/:id', requireAuthAdmin, async (req, res) => {
 });
 
 module.exports = router;
+// Shared with routes/djTexting.js so the DJ pages reuse the same draft,
+// confirm and status code paths and the same page chrome.
+module.exports.helpers = {
+  createDraftHandler,
+  page,
+  jsonForScript,
+  CLIENT_MEASURE_JS,
+  MAX_CHARACTERS,
+  DJ_SENDING_OFF
+};

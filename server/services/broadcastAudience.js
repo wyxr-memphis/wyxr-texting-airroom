@@ -44,7 +44,7 @@ const ELIGIBLE_WHERE = `
  * explain why the total is lower than the contacts page's opted-in headline.
  * Nothing can pull those contacts into an actual send.
  */
-const getRecipientCounts = async () => {
+const getListenerCounts = async () => {
   const { rows } = await pool.query(
     `SELECT
        COUNT(*) FILTER (WHERE ${ELIGIBLE_WHERE}) AS eligible,
@@ -92,7 +92,7 @@ const getRecipientCounts = async () => {
  * NOTHING makes a retry harmless: the UNIQUE (broadcast_id, phone_number)
  * constraint means a listener can never get two rows for one broadcast.
  */
-const snapshotRecipients = async (client, broadcastId) => {
+const snapshotListeners = async (client, broadcastId) => {
   const { rowCount } = await client.query(
     `INSERT INTO broadcast_recipients (broadcast_id, phone_number, opt_in_method)
      SELECT $2, c.phone_number, c.opt_in_method
@@ -104,8 +104,85 @@ const snapshotRecipients = async (client, broadcastId) => {
   return rowCount;
 };
 
+// ---------------------------------------------------------------------------
+// DJ audience (migration 007). Reads dj_roster only, never contacts.
+//
+// A DJ gets group texts when they are on the roster (active), signed up by
+// texting DJ and replying YES (opted_in), have not replied STOP, and have a
+// first AND last name on file. A blank or whitespace-only name excludes them:
+// staff must know who every recipient is.
+// ---------------------------------------------------------------------------
+const DJ_HAS_NAME = `
+  btrim(COALESCE(d.first_name, '')) <> ''
+  AND btrim(COALESCE(d.last_name, '')) <> ''
+`;
+
+const DJ_SIGNED_UP = `
+  d.active = true
+  AND d.opted_in = true
+  AND d.opted_out = false
+`;
+
+const DJ_ELIGIBLE_WHERE = `${DJ_SIGNED_UP} AND ${DJ_HAS_NAME}`;
+
+/**
+ * Live DJ count. missingName is signed-up DJs left out only because a first
+ * or last name is blank; the compose page names that number.
+ */
+const getDjCounts = async () => {
+  const { rows: [row] } = await pool.query(
+    `SELECT
+       COUNT(*) FILTER (WHERE ${DJ_ELIGIBLE_WHERE}) AS eligible,
+       COUNT(*) FILTER (WHERE ${DJ_SIGNED_UP} AND NOT (${DJ_HAS_NAME})) AS missing_name,
+       COUNT(*) FILTER (WHERE d.active = true AND d.opted_in = false AND d.opted_out = false) AS waiting,
+       COUNT(*) FILTER (WHERE d.active = true AND d.opted_out = true) AS opted_out
+     FROM dj_roster d`
+  );
+  return {
+    count: parseInt(row.eligible, 10),
+    missingName: parseInt(row.missing_name, 10),
+    waiting: parseInt(row.waiting, 10),
+    optedOut: parseInt(row.opted_out, 10)
+  };
+};
+
+const snapshotDjs = async (client, broadcastId) => {
+  const { rowCount } = await client.query(
+    `INSERT INTO broadcast_recipients (broadcast_id, phone_number, opt_in_method)
+     SELECT $1, d.phone_number, d.opt_in_method
+     FROM dj_roster d
+     WHERE ${DJ_ELIGIBLE_WHERE}
+     ON CONFLICT (broadcast_id, phone_number) DO NOTHING`,
+    [broadcastId]
+  );
+  return rowCount;
+};
+
+const AUDIENCES = ['listeners', 'djs'];
+
+const assertAudience = (audience) => {
+  if (!AUDIENCES.includes(audience)) {
+    throw new Error(`Unknown broadcast audience: ${audience}`);
+  }
+};
+
+/** Live recipient count for an audience. Defaults to listeners. */
+const getRecipientCounts = async (audience = 'listeners') => {
+  assertAudience(audience);
+  return audience === 'djs' ? getDjCounts() : getListenerCounts();
+};
+
+/** Snapshot an audience into broadcast_recipients, inside the caller's transaction. */
+const snapshotRecipients = async (client, broadcastId, audience = 'listeners') => {
+  assertAudience(audience);
+  return audience === 'djs'
+    ? snapshotDjs(client, broadcastId)
+    : snapshotListeners(client, broadcastId);
+};
+
 module.exports = {
   ELIGIBLE_METHODS,
+  AUDIENCES,
   getRecipientCounts,
   snapshotRecipients
 };
