@@ -219,14 +219,21 @@ describe('name capture', () => {
     assert.equal(bad.status, 400);
     bad = await staff.post('/admin/djs', { json: { phone: '901-555-0152', firstName: 'a'.repeat(101), lastName: 'b' } });
     assert.equal(bad.status, 400);
-    bad = await staff.post('/admin/djs', { json: { phone: 'not a phone' } });
+    bad = await staff.post('/admin/djs', { json: { phone: 'not a phone', showName: 'Night Moves' } });
     assert.equal(bad.status, 400);
+    // Show is required, on add and on edit.
+    bad = await staff.post('/admin/djs', { json: { phone: '901-555-0154', showName: '   ' } });
+    assert.equal(bad.status, 400);
+    assert.match(bad.data.error, /show name/);
+    bad = await staff.patch(`/admin/djs/${dj.id}`, { json: { phone: dj.phone_number, firstName: 'Ana', lastName: 'Lee' } });
+    assert.equal(bad.status, 400);
+    assert.equal((await h.getDj(dj.id)).show_name, 'Night Moves');
     // Blank names on add are allowed (the app asks by text later).
-    const ok = await staff.post('/admin/djs', { json: { phone: '(901) 555-0153' } });
+    const ok = await staff.post('/admin/djs', { json: { phone: '(901) 555-0153', showName: 'Night Moves' } });
     assert.equal(ok.status, 200);
     assert.equal(ok.data.phone, '+19015550153');
     assert.equal(ok.data.needsName, true);
-    const dup = await staff.post('/admin/djs', { json: { phone: '901-555-0153' } });
+    const dup = await staff.post('/admin/djs', { json: { phone: '901-555-0153', showName: 'Other Show' } });
     assert.equal(dup.status, 409);
     // Remove never deletes.
     const removed = await staff.post(`/admin/djs/${ok.data.id}/remove`, { json: {} });

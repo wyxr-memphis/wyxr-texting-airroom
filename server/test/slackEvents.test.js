@@ -220,7 +220,7 @@ describe('end to end: DJ reply -> Slack thread -> staff answer -> text', () => {
     const staff = h.client();
     await staff.login('staff');
     await h.pool.query('UPDATE dj_roster SET active = false WHERE id = $1', [dj.id]);
-    const res = await staff.post('/admin/djs', { json: { phone: dj.phone_number, firstName: 'Ana', lastName: 'Lee-Park' } });
+    const res = await staff.post('/admin/djs', { json: { phone: dj.phone_number, firstName: 'Ana', lastName: 'Lee-Park', showName: 'Night Moves' } });
     assert.equal(res.status, 200, res.text);
     assert.equal(res.data.id, dj.id);
     assert.equal(res.data.active, true);

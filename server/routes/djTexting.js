@@ -55,7 +55,10 @@ const parseDjInput = (input = {}) => {
     return { error: `First and last name can be at most ${NAME_MAX} characters each.` };
   }
 
+  // Show is required: with this many DJs, names alone are hard to tell apart
+  // on the roster and in Slack.
   const showName = typeof input.showName === 'string' ? input.showName.trim() : '';
+  if (!showName) return { error: 'Enter the DJ\'s show name.' };
   if (showName.length > SHOW_MAX) return { error: `Show name can be at most ${SHOW_MAX} characters.` };
 
   const notes = typeof input.notes === 'string' ? input.notes.trim().slice(0, 2000) : null;
@@ -335,12 +338,12 @@ router.get('/djs', requireStaffAdmin, async (req, res) => {
 
   <div class="panel" id="form-panel">
     <h2 id="form-title">Add a DJ</h2>
-    <p class="muted" style="margin-bottom:12px;">Phone is required. Leave both names blank and the app will ask the DJ by text after they reply YES. A DJ gets no group texts until a first and last name is on file.</p>
+    <p class="muted" style="margin-bottom:12px;">Phone and show are required. Leave both names blank and the app will ask the DJ by text after they reply YES. A DJ gets no group texts until a first and last name is on file.</p>
     <div class="form-grid">
       <div><label for="f-first">First name</label><input type="text" id="f-first" maxlength="${NAME_MAX}"></div>
       <div><label for="f-last">Last name</label><input type="text" id="f-last" maxlength="${NAME_MAX}"></div>
-      <div><label for="f-show">Show</label><input type="text" id="f-show" maxlength="${SHOW_MAX}"></div>
-      <div><label for="f-phone">Phone</label><input type="tel" id="f-phone" placeholder="901-555-1234"></div>
+      <div><label for="f-show">Show (required)</label><input type="text" id="f-show" maxlength="${SHOW_MAX}" required></div>
+      <div><label for="f-phone">Phone (required)</label><input type="tel" id="f-phone" placeholder="901-555-1234" required></div>
     </div>
     <button class="btn btn-primary" id="save-btn">Add DJ</button>
     <button class="btn" id="cancel-edit" style="display:none; background:#444; color:#fff;">Cancel</button>

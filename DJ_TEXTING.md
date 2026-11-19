@@ -55,6 +55,12 @@ The header lives in `server/utils/adminChrome.js`.
 On "Roster & replies", each item in the reply list is tagged: **Text from DJ**
 (pink), **New** (yellow, unread) or **Staff reply via Slack** (blue).
 
+Phone and show name are required when staff add or edit a DJ (with this
+many DJs, names alone are hard to tell apart on the roster and in Slack).
+Names may be left blank for the app to collect by text. The show is not part
+of the broadcast audience rule, so a DJ added before this rule without a show
+still gets group texts; staff fill it in the next time they edit that DJ.
+
 Remove sets `active = false`; rows are never deleted. Re-adding a removed DJ's
 number brings the same row back.
 
@@ -63,7 +69,7 @@ number brings the same row back.
 The app never texts a DJ first. The registered campaign says DJs opt in by
 texting the keyword.
 
-1. Staff add the DJ on `/admin/djs` (phone required, names optional).
+1. Staff add the DJ on `/admin/djs` (phone and show required, names optional).
 2. The DJ texts **DJ** to the DJ line and gets `DJ_OPT_IN_REQUEST`.
 3. The DJ replies **YES** (or **Y**) and gets `DJ_OPT_IN_CONFIRMATION`. If a
    name is missing, they also get `DJ_NAME_REQUEST`.
