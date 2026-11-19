@@ -253,6 +253,7 @@ Render free tier spins down after 15min idle. First request takes 50+ seconds. F
 - `DEPLOYMENT_STATUS.md` - Current deployment status and checklist
 - `FEATURE_REQUESTS.md` - Future enhancements (A2P reply, voice messages)
 - `DJ_TEXTING.md` - DJ texting group: second Twilio number, staff login, DJ roster, Slack reply relay
+- `SUBDOMAIN_MIGRATION.md` - Plan (not started) for moving the app to a wyxr.org subdomain
 
 ## Deployment
 
