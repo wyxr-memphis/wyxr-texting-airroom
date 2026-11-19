@@ -32,11 +32,28 @@ asks the DJ by text right after they reply YES (at most 3 times).
 
 ## Pages
 
+Staff sign in at `/admin/login` with the staff login (they land on
+`/admin/djs`). Every admin page has the same header:
+
+- a line badge: blue **Listener line** (Messages, Contacts, Broadcasts) or
+  pink **DJ line · staff only** (the three DJ pages), with that line's number
+- the same nav on every page, in two groups: listener pages in blue, DJ pages
+  in pink (the DJ group only shows for staff). The current page is yellow.
+- who is signed in (staff or the shared login) and a **Log out** button
+  (`POST /admin/logout`)
+
+The header lives in `server/utils/adminChrome.js`.
+
 | Page | What it does |
 |---|---|
-| `/admin/djs` | Roster (first name, last name, show, phone, status badge, "Needs name" badge), add/edit/remove, the "Text DJ to …" instruction, latest 50 DJ replies and staff answers with mark-read |
+| `/admin/djs` ("Roster & replies") | Roster (first name, last name, show, phone, status badge, "Needs name" badge), add/edit/remove, the "Text DJ to …" instruction, latest 50 DJ replies and staff answers with mark-read |
 | `/admin/djs/message` | DJ-only compose page: live count, test send, confirm. Every text is laid out as `WYXR DJs:` on the first line, the message on its own line, then a blank line and `Reply STOP to opt out.` |
+| `/admin/broadcasts?audience=djs` ("Sent to DJs") | History of DJ broadcasts (staff only; anyone else gets the listener list) |
+| `/admin/broadcasts` | History of listener broadcasts only |
 | `/admin/broadcasts/:id` | Shared status page (shows "DJs only" for DJ broadcasts) |
+
+On "Roster & replies", each item in the reply list is tagged: **Text from DJ**
+(pink), **New** (yellow, unread) or **Staff reply via Slack** (blue).
 
 Remove sets `active = false`; rows are never deleted. Re-adding a removed DJ's
 number brings the same row back.
@@ -115,9 +132,17 @@ still saved and listed on `/admin/djs`, and the page shows a notice.
    `SLACK_DJ_CHANNEL_ID`.
 5. Deploy with the env vars set (the request URL must answer before Slack
    accepts it).
-6. **Event Subscriptions:** turn on, request URL
+6. **Socket Mode must be off.** With it on, Slack ignores the request URL
+   (it still shows Verified) and no events reach the app.
+7. **Event Subscriptions:** turn on, request URL
    `https://wyxr-texting-airroom.onrender.com/slack/events`. Under
-   **Subscribe to bot events** add `message.groups`. Save.
+   **Subscribe to bot events** (not "on behalf of users") add
+   `message.groups`. Save, then reinstall the app when Slack asks.
+
+If staff replies aren't texted, check the Render logs for `[slack-events]`.
+Every event Slack delivers logs one line with its outcome (sent, skipped and
+why, or ignored and why). No `[slack-events]` lines at all means Slack isn't
+delivering: check steps 4, 6 and 7.
 
 ### How the relay behaves
 
@@ -128,7 +153,8 @@ still saved and listed on `/admin/djs`, and the page shows a notice.
   logged; the reply is kept and the Twilio webhook still succeeds.
 - **Staff → DJ:** only a human reply inside a known DJ thread in the DJ
   channel is acted on. Edits, deletes, joins, bot posts, top-level posts and
-  other channels are ignored. Slack retries are deduplicated by the event's
+  other channels are ignored. A thread reply with "Also send to channel"
+  ticked (subtype `thread_broadcast`) is still texted. Slack retries are deduplicated by the event's
   `ts`. The reply is converted to plain text (links become `label (url)`,
   mentions are dropped), sent in the same layout as broadcasts (`WYXR DJs:` line, message, STOP line),
   and gets a :white_check_mark: when sent.
