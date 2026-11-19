@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
-const { requireAuth, requireAuthAdmin, isStaff } = require('../middleware/auth');
+const { requireAuth, requireAuthAdmin, isStaff, sessionRole } = require('../middleware/auth');
+const { adminHeader, CHROME_STYLES } = require('../utils/adminChrome');
 const { verifyCredentials } = require('../utils/credentials');
 const { loginLimiters } = require('../middleware/loginLimiter');
 const { escapeHtml } = require('../utils/html');
@@ -67,6 +68,14 @@ router.post('/login', ...loginLimiters, (req, res) => {
   }
   console.warn(`Failed login attempt on /admin/login from IP ${req.ip}`);
   return res.redirect('/admin/login?error=1');
+});
+
+// POST /admin/logout - end the session (shared or staff) and go to the login form
+router.post('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie('connect.sid');
+    res.redirect('/admin/login');
+  });
 });
 
 // GET /admin/messages/search - Search and filter messages (API endpoint)
@@ -545,18 +554,11 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
         min-width: 800px;
       }
     }
+    ${CHROME_STYLES}
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>WYXR 91.7FM</h1>
-    <p>Message History - Admin Panel</p>
-    <div class="nav-links">
-      <a href="/admin/messages" class="nav-link active">Messages</a>
-      <a href="/admin/contacts" class="nav-link">Contacts</a>
-      <a href="/admin/broadcasts" class="nav-link">Broadcasts</a>
-    </div>
-  </div>
+  ${adminHeader({ active: 'messages', role: sessionRole(req), heading: 'Listener messages', subtitle: 'Every text listeners have sent to the station line' })}
 
   <div class="stats">
     <div class="stat-card">
@@ -1844,18 +1846,11 @@ router.get('/contacts', requireAuthAdmin, async (req, res) => {
         min-width: 1000px;
       }
     }
+    ${CHROME_STYLES}
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>WYXR 91.7FM</h1>
-    <p>SMS Opt-In Contacts - Admin Panel</p>
-    <div class="nav-links">
-      <a href="/admin/messages" class="nav-link">Messages</a>
-      <a href="/admin/contacts" class="nav-link active">Contacts</a>
-      <a href="/admin/broadcasts" class="nav-link">Broadcasts</a>
-    </div>
-  </div>
+  ${adminHeader({ active: 'contacts', role: sessionRole(req), heading: 'Listener contacts', subtitle: 'Listeners who have opted in to texts from the station line' })}
 
   <!-- Add Contact & CSV Import -->
   <div class="import-section">

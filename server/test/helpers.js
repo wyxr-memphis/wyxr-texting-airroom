@@ -96,6 +96,8 @@ function client() {
     return { status: res.status, headers: res.headers, text, data };
   };
   return {
+    // The session id from the connect.sid cookie (signed value "s:<sid>.<sig>").
+    sessionId: () => (cookie ? decodeURIComponent(cookie.split('=')[1]).replace(/^s:/, '').split('.')[0] : null),
     get: (p, o) => request('GET', p, o),
     post: (p, o) => request('POST', p, o),
     patch: (p, o) => request('PATCH', p, o),

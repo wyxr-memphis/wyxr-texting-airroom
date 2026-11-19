@@ -22,6 +22,7 @@ const twilioService = require('../services/twilio');
 const { measure, fullTextFor, findShorteners, COMPLIANCE_SUFFIX } = require('../utils/smsText');
 const { getRecipientCounts, snapshotRecipients } = require('../services/broadcastAudience');
 const reconsent = require('../services/reconsent');
+const { adminHeader, CHROME_STYLES } = require('../utils/adminChrome');
 
 const MAX_CHARACTERS = parseInt(process.env.BROADCAST_MAX_CHARACTERS || '1200', 10);
 const MAX_RECIPIENTS = parseInt(process.env.BROADCAST_MAX_RECIPIENTS || '2000', 10);
@@ -566,29 +567,16 @@ const SHARED_STYLES = `
     }
 `;
 
-// The DJs link only renders for staff sessions.
-const navLinks = (active, role = 'dj') => `
-    <div class="nav-links">
-      <a href="/admin/messages" class="nav-link${active === 'messages' ? ' active' : ''}">Messages</a>
-      <a href="/admin/contacts" class="nav-link${active === 'contacts' ? ' active' : ''}">Contacts</a>
-      <a href="/admin/broadcasts" class="nav-link${active === 'broadcasts' ? ' active' : ''}">Broadcasts</a>${role === 'staff' ? `
-      <a href="/admin/djs" class="nav-link${active === 'djs' ? ' active' : ''}">DJs</a>` : ''}
-    </div>`;
-
 const page = ({ title, heading, subtitle, active, body, script, role }) => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
-  <style>${SHARED_STYLES}</style>
+  <style>${SHARED_STYLES}${CHROME_STYLES}</style>
 </head>
 <body>
-  <div class="header">
-    <h1>${escapeHtml(heading)}</h1>
-    <p>${escapeHtml(subtitle)}</p>
-    ${navLinks(active, role)}
-  </div>
+  ${adminHeader({ active, role, heading, subtitle })}
   ${body}
   <script>${script || ''}</script>
 </body>
@@ -853,8 +841,8 @@ ${CLIENT_MEASURE_JS}
 
     res.send(page({
       title: 'New Broadcast - WYXR Admin',
-      heading: 'New Broadcast',
-      subtitle: 'Send one message to every listener who opted in',
+      heading: 'New listener broadcast',
+      subtitle: 'Send one message to every listener who opted in. DJs are not included.',
       active: 'broadcasts',
       role: sessionRole(req),
       body,
@@ -866,25 +854,26 @@ ${CLIENT_MEASURE_JS}
   }
 });
 
-// GET /admin/broadcasts - history
+// GET /admin/broadcasts - history, one line at a time. Listener broadcasts by
+// default; ?audience=djs shows DJ broadcasts and is staff-only (anyone else
+// gets the listener list). Keeping the two apart is what stops staff mixing
+// up a listener send with a DJ notice.
 router.get('/broadcasts', requireAuthAdmin, async (req, res) => {
   try {
-    // DJ broadcasts are hidden from the shared login; staff see both, with
-    // an audience column.
-    const staff = isStaff(req);
+    const djView = req.query.audience === 'djs' && isStaff(req);
+    const audience = djView ? 'djs' : 'listeners';
     const { rows } = await pool.query(
       `SELECT * FROM broadcasts
-       ${staff ? '' : "WHERE audience <> 'djs'"}
-       ORDER BY COALESCE(confirmed_at, created_at) DESC LIMIT 100`
+       WHERE audience = $1
+       ORDER BY COALESCE(confirmed_at, created_at) DESC LIMIT 100`,
+      [audience]
     );
-    const cols = staff ? 7 : 6;
 
     const rowsHtml = rows.length === 0
-      ? `<tr><td colspan="${cols}" class="muted">No broadcasts yet.</td></tr>`
+      ? `<tr><td colspan="6" class="muted">${djView ? 'No DJ broadcasts yet.' : 'No broadcasts yet.'}</td></tr>`
       : rows.map((b) => `
         <tr>
-          <td class="timestamp">${new Date(b.confirmed_at || b.created_at).toLocaleString()}</td>${staff ? `
-          <td>${b.audience === 'djs' ? '<span class="status-badge status-djs">DJs</span>' : 'Listeners'}</td>` : ''}
+          <td class="timestamp">${new Date(b.confirmed_at || b.created_at).toLocaleString()}</td>
           <td>${escapeHtml(b.body.length > 70 ? b.body.slice(0, 70) + '…' : b.body)}</td>
           <td><span class="status-badge status-${escapeHtml(b.status)}">${escapeHtml(b.status)}</span></td>
           <td>${b.recipient_count}</td>
@@ -892,24 +881,30 @@ router.get('/broadcasts', requireAuthAdmin, async (req, res) => {
           <td><a href="/admin/broadcasts/${b.id}" class="nav-link" style="padding:6px 14px;">View</a></td>
         </tr>`).join('');
 
+    const newButton = djView
+      ? '<a href="/admin/djs/message" class="nav-link" style="background:#E9407A;">+ Text all DJs</a>'
+      : '<a href="/admin/broadcasts/new" class="nav-link" style="background:#2B9EB3;">+ New listener broadcast</a>';
+
     const body = `
-  <div style="margin-bottom:20px;">
-    <a href="/admin/broadcasts/new" class="nav-link" style="background:#2B9EB3;">+ New Broadcast</a>
-  </div>
+  <div style="margin-bottom:20px;">${newButton}</div>
   <div class="panel" style="padding:0; overflow:hidden;">
+    <div style="overflow-x:auto;">
     <table>
       <thead>
-        <tr><th>When</th>${staff ? '<th>Audience</th>' : ''}<th>Message</th><th>Status</th><th>Recipients</th><th>Delivery</th><th></th></tr>
+        <tr><th>When</th><th>Message</th><th>Status</th><th>Recipients</th><th>Delivery</th><th></th></tr>
       </thead>
       <tbody>${rowsHtml}</tbody>
     </table>
+    </div>
   </div>`;
 
     res.send(page({
-      title: 'Broadcasts - WYXR Admin',
-      heading: 'Broadcasts',
-      subtitle: 'Station announcements sent to the opted-in list',
-      active: 'broadcasts',
+      title: djView ? 'DJ Broadcasts - WYXR Admin' : 'Broadcasts - WYXR Admin',
+      heading: djView ? 'Sent to DJs' : 'Listener broadcasts',
+      subtitle: djView
+        ? 'Group texts sent to DJs from the DJ line'
+        : 'Station announcements sent to listeners who opted in',
+      active: djView ? 'dj-broadcasts' : 'broadcasts',
       role: sessionRole(req),
       body
     }));
@@ -1045,9 +1040,9 @@ router.get('/broadcasts/:id', requireAuthAdmin, async (req, res) => {
 
     res.send(page({
       title: `Broadcast #${broadcast.id} - WYXR Admin`,
-      heading: `Broadcast #${broadcast.id}`,
-      subtitle: isDj ? 'DJ broadcast: delivery progress' : 'Delivery progress',
-      active: isDj ? 'djs' : 'broadcasts',
+      heading: isDj ? `DJ broadcast #${broadcast.id}` : `Listener broadcast #${broadcast.id}`,
+      subtitle: isDj ? 'Delivery progress (DJs only, not listeners)' : 'Delivery progress',
+      active: isDj ? 'dj-broadcasts' : 'broadcasts',
       role: sessionRole(req),
       body,
       script

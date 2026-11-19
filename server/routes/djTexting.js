@@ -214,9 +214,13 @@ const DJ_STYLES = `
     .notice { background:#3a2a10; border:2px solid #FFC629; color:#FFC629; padding:14px 18px; border-radius:8px; margin-bottom:20px; }
     .instruction { font-size:1.4rem; color:#FFC629; font-weight:700; }
     .form-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px; }
-    .reply { padding:14px; border-bottom:1px solid #333; }
-    .reply.unread { background:#2a2410; border-left:4px solid #FFC629; }
-    .reply.out { border-left:4px solid #2B9EB3; }
+    .reply { padding:14px; border-bottom:1px solid #333; border-left:4px solid #E9407A; }
+    .reply.unread { background:#2a2410; border-left-color:#FFC629; }
+    .reply.out { border-left-color:#2B9EB3; }
+    .chip { display:inline-block; font-size:0.72rem; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:2px 8px; border-radius:999px; margin-right:8px; vertical-align:middle; }
+    .chip-dj { background:#E9407A; color:#fff; }
+    .chip-staff { background:#2B9EB3; color:#fff; }
+    .chip-new { background:#FFC629; color:#1a1a1a; }
     .reply .who { font-weight:600; color:#FFC629; }
     .reply .meta { color:#888; font-size:0.85rem; margin-top:4px; }
     .reply .text { margin-top:6px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
@@ -299,9 +303,9 @@ router.get('/djs', requireStaffAdmin, async (req, res) => {
       : feed.map((r) => r.kind === 'in'
         ? `
         <div class="reply${r.read ? '' : ' unread'}" id="in-${r.id}">
-          <div class="who">${escapeHtml(whoFor(r))}</div>
+          <div class="who"><span class="chip chip-dj">Text from DJ</span>${r.read ? '' : '<span class="chip chip-new">New</span>'}${escapeHtml(whoFor(r))}</div>
           <div class="text">${escapeHtml(r.body)}</div>
-          <div class="meta">${escapeHtml(new Date(r.at).toLocaleString())} · from DJ
+          <div class="meta">${escapeHtml(new Date(r.at).toLocaleString())}
             <button class="btn btn-primary btn-small" style="margin-left:10px;" data-read="${r.id}" data-read-value="${r.read ? 'false' : 'true'}">
               ${r.read ? 'Mark unread' : 'Mark read'}
             </button>
@@ -309,7 +313,7 @@ router.get('/djs', requireStaffAdmin, async (req, res) => {
         </div>`
         : `
         <div class="reply out">
-          <div class="who">Staff → ${escapeHtml(whoFor(r))}</div>
+          <div class="who"><span class="chip chip-staff">Staff reply via Slack</span>to ${escapeHtml(whoFor(r))}</div>
           <div class="text">${escapeHtml(slack.slackToPlainText(r.body))}</div>
           <div class="meta">${escapeHtml(new Date(r.at).toLocaleString())} · via Slack · ${escapeHtml(r.status || 'sending')}${r.error ? ' · ' + escapeHtml(r.error) : ''}</div>
         </div>`).join('');
@@ -426,8 +430,8 @@ router.get('/djs', requireStaffAdmin, async (req, res) => {
 
     res.send(page({
       title: 'DJs - WYXR Admin',
-      heading: 'DJs',
-      subtitle: 'DJ roster, sign-ups and replies (staff only)',
+      heading: 'DJ roster & replies',
+      subtitle: 'Who gets DJ texts, who has signed up, and what DJs have texted back',
       active: 'djs',
       role: 'staff',
       body,
@@ -586,7 +590,7 @@ ${CLIENT_MEASURE_JS}
       title: 'Text DJs - WYXR Admin',
       heading: 'Text all DJs',
       subtitle: 'Sent from the DJ line, never to listeners',
-      active: 'djs',
+      active: 'dj-message',
       role: 'staff',
       body,
       script
