@@ -143,7 +143,8 @@ router.get('/messages/search', requireAuth, async (req, res) => {
     const query = `
       SELECT m.*,
              EXISTS(SELECT 1 FROM blocked_numbers b WHERE b.phone = m.phone) as is_blocked,
-             COALESCE(c.opted_in, false) as opted_in
+             COALESCE(c.opted_in, false) as opted_in,
+             c.first_name
       FROM messages m
       LEFT JOIN contacts c ON m.phone = c.phone_number
       WHERE ${conditions.join(' AND ')}
@@ -178,7 +179,8 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT m.id, m.phone, m.text, m.timestamp, m.read, m.replied, m.reply_text, m.replied_at, m.created_at,
-             COALESCE(c.opted_in, false) as opted_in
+             COALESCE(c.opted_in, false) as opted_in,
+             c.first_name
       FROM messages m
       LEFT JOIN contacts c ON m.phone = c.phone_number
       ORDER BY m.timestamp DESC
@@ -489,6 +491,12 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
       font-weight: 600;
     }
 
+    .contact-name {
+      color: #FFC629;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
     .message-text {
       max-width: 400px;
       word-wrap: break-word;
@@ -628,7 +636,7 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
         <tbody>
           ${messages.map(msg => `
             <tr data-id="${msg.id}">
-              <td class="phone">${escapeHtml(formatPhone(msg.phone))}</td>
+              <td class="phone">${msg.first_name ? `<div class="contact-name">${escapeHtml(msg.first_name)}</div>` : ''}${escapeHtml(formatPhone(msg.phone))}</td>
               <td class="message-text">
                 ${escapeHtml(msg.text)}
                 ${msg.replied ? `<div class="reply-text">↳ Reply: ${escapeHtml(msg.reply_text || '')}</div>` : ''}
@@ -782,7 +790,7 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
 
       tbody.innerHTML = messages.map(msg => \`
         <tr data-id="\${msg.id}">
-          <td class="phone">\${escapeHtml(formatPhone(msg.phone))}</td>
+          <td class="phone">\${msg.first_name ? \`<div class="contact-name">\${escapeHtml(msg.first_name)}</div>\` : ''}\${escapeHtml(formatPhone(msg.phone))}</td>
           <td class="message-text">
             \${escapeHtml(msg.text)}
             \${msg.replied ? \`<div class="reply-text">↳ Reply: \${escapeHtml(msg.reply_text || '')}</div>\` : ''}
@@ -915,9 +923,10 @@ router.get('/messages', requireAuthAdmin, async (req, res) => {
 
         // CSV Format
         const csv = [
-          ['ID', 'Phone', 'Message', 'Timestamp', 'Read', 'Replied', 'Reply Text', 'Blocked'],
+          ['ID', 'Name', 'Phone', 'Message', 'Timestamp', 'Read', 'Replied', 'Reply Text', 'Blocked'],
           ...messages.map(m => [
             m.id,
+            (m.first_name || '').replace(/"/g, '""'),
             m.phone,
             m.text.replace(/"/g, '""'),  // Escape quotes
             new Date(m.timestamp).toISOString(),
